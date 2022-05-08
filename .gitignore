@@ -1,6 +1,7 @@
 .vscode
-env
+env*
 dist
 build
 __pycache__
 *.egg-info
+notebook
