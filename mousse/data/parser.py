@@ -1,12 +1,23 @@
 import collections
+import json
+from pathlib import Path
 from typing import *
+
+import yaml
 
 from .dataclass import Dataclass
 from .field import Field, get_fields_info
+from .types import Generic, get_args, get_origin
 from .validator import validate
-from .types import get_args, get_origin, Generic
 
 __all__ = ["Parser", "asdict", "asclass", "parse", "parser"]
+
+
+def load_yaml(stream: Any) -> Dict[str, Any]:
+    return yaml.load(stream, Loader=yaml.Loader) or {}
+
+
+LOADER = {".json": json.load, ".yaml": load_yaml, ".yml": load_yaml}
 
 
 parsers = {}
@@ -43,8 +54,7 @@ def parse(G: Union[Generic, Type], obj: Any):
         return obj
 
     if issubclass(G, Dataclass):
-        if isinstance(obj, dict):
-            return G(**obj)
+        return asclass(G, obj)
 
     return G(obj)
 
@@ -72,6 +82,9 @@ def parse_sequence(G: Generic, obj: Any):
 
 @parser(Tuple)
 def parse_tuple(G: Generic, obj: Any):
+    if G is tuple:
+        return tuple(obj)
+
     args = get_args(G)
 
     if len(args) == 1 and len(obj) > 1:
@@ -135,7 +148,7 @@ class Parser(metaclass=ParserMetaclass):
 
 class DictParser(Parser):
     def __call__(self, val: Any, field: Field):
-        if isinstance(field.annotation, Generic):
+        if isinstance(field.annotation, get_args(Generic)):
             val = parse(get_origin(field.annotation), val)
 
         return val
@@ -144,6 +157,20 @@ class DictParser(Parser):
 class ClassParser(Parser):
     def __call__(self, val: Any, field: Field) -> Any:
         return parse(field.annotation, val)
+
+
+def load(path: Union[str, Path]) -> Dict[str, Any]:
+    if type(path) is not Path:
+        path = Path(path).resolve()
+
+    with open(path, encoding="utf-8") as f:
+        loader = LOADER.get(path.suffix)
+        if loader is None:
+            raise Exception(f"file format {path.suffix} is not supported")
+
+        params = loader(f)
+
+    return params
 
 
 def asdict(obj: Dataclass, by_alias: bool = True, parser: Parser = DictParser()):
@@ -174,7 +201,19 @@ def asdict(obj: Dataclass, by_alias: bool = True, parser: Parser = DictParser())
     return dictionary
 
 
-def asclass(cls: Type[Dataclass], obj: Any, parser: Parser = ClassParser()):
+def asclass(
+    cls: Type[Dataclass],
+    obj: Any = None,
+    path: Union[str, Path] = None,
+    parser: Parser = ClassParser(),
+):
+    assert (obj is not None) ^ (path is not None), f"Only use obj or path at once"
+
+    if path is not None:
+        if type(path) is not Path:
+            path = Path(path).resolve()
+            obj = load(path)
+
     assert issubclass(type(obj), Mapping), f"Unable to convert {type(obj)} to {cls}"
     fields: Dict[str, Field] = get_fields_info(cls)
 
@@ -184,5 +223,10 @@ def asclass(cls: Type[Dataclass], obj: Any, parser: Parser = ClassParser()):
             alias[field.alias] = key
 
     data = {**obj}
-    data = {alias.get(key, key): val for key, val in data.items() if key in fields}
+    data = {
+        alias.get(key, key): val
+        for key, val in data.items()
+        if alias.get(key, key) in fields
+    }
+
     return cls(**{key: parser(val, fields[key]) for key, val in data.items()})

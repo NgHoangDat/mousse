@@ -1,5 +1,6 @@
 from copy import copy, deepcopy
 from inspect import Parameter, Signature
+from pathlib import Path
 from typing import *
 
 from .accessor import Accessor
@@ -69,7 +70,9 @@ class DataMetaclass(type):
             for key, val in kwargs.items():
                 if key in keys:
                     setattr(self, key, val)
-            self.build(*args, **kwargs)
+
+            if hasattr(self, "__build__"):
+                self.__build__(*args, **kwargs)
 
         def __copy__(self):
             cls = self.__class__
@@ -130,5 +133,4 @@ class DataMetaclass(type):
 
 
 class Dataclass(metaclass=DataMetaclass):
-    def build(self, *args, **kwargs):
-        pass
+    pass

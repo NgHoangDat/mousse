@@ -37,9 +37,6 @@ class Mediator(metaclass=MediatorMetaclass):
         instance.listeners = defaultdict(list)
         return instance
 
-    def build(self, *args, **kwargs):
-        pass
-
     def notify(self, key: str):
         unique_listeners = set()
         for listener in self.listeners[key]:

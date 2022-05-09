@@ -27,7 +27,8 @@ def validator(*types: Type[Generic], func: Callable = None):
 
 def validate(G: Union[Generic, Type], obj: Any, strict: bool = True):
     if isinstance(G, get_args(Generic)):
-        origin = get_origin(G)
+        origin = get_origin(G) if G is not Any else Any
+
         if origin not in validators:
             return not strict
 
@@ -75,9 +76,10 @@ def validate_dict(G: Generic, obj: Any):
         return False
 
     key_type, val_type = get_args(G)
-    return all(validate(key_type, key) for key in obj.keys()) and all(
-        validate(val_type, val) for val in obj.values()
-    )
+    is_key_valid = all(validate(key_type, key) for key in obj.keys())
+    is_val_valid = all(validate(val_type, val) for val in obj.values())
+
+    return is_key_valid and is_val_valid
 
 
 @validator(Union)

@@ -12,7 +12,7 @@ from typing import Callable
 
 from yaml import Loader, load
 
-from ..data import Dataclass, asdict, parse, parser
+from ..data import parse, parser
 from ..scheduler import call_after
 
 NoneType = type(None)
@@ -36,11 +36,11 @@ class ConfigDetail:
         components = []
         for key in self:
             val = getattr(self, key)
-            
-        if type(val) is str:
-            components.append(f"{key}=\"{val}\"")
-        else:
-            components.append(f"{key}={val}")
+
+            if type(val) is str:
+                components.append(f'{key}="{val}"')
+            else:
+                components.append(f"{key}={val}")
 
         components = ", ".join(components)
 
@@ -59,6 +59,11 @@ class ConfigDetailAccessor:
 
     def __get__(self, obj: Any, *args, **kwargs):
         return deepcopy(self.val)
+    
+    def __set__(self, obj: Any, val: Any):
+        container = get_container(obj)
+        assert not container.freeze, f"Permission denied"
+        self.val = val
 
 
 @lru_cache(typed=True)
@@ -103,7 +108,7 @@ class Config(Mapping):
         for key in self:
             val = getattr(self, key)
             if type(val) is str:
-                components.append(f"{key}=\"{val}\"")
+                components.append(f'{key}="{val}"')
             else:
                 components.append(f"{key}={val}")
 
@@ -164,7 +169,7 @@ def watch(
 
 def asdetail(obj: Any):
     if isinstance(obj, dict):
-        data = {key: asdetail(val) for key, val in obj.items()}
+        data = {key: ConfigDetailAccessor(asdetail(val)) for key, val in obj.items()}
 
         def __iter__(self):
             for key in obj:
@@ -178,7 +183,10 @@ def asdetail(obj: Any):
 
         return type("ConfigDetail", (ConfigDetail,), data)()
 
-    return ConfigDetailAccessor(obj)
+    if isinstance(obj, (list, set, tuple)):
+        return tuple(asdetail(val) for val in obj)
+
+    return obj
 
 
 def update(config: Config, **kwargs):
@@ -224,6 +232,9 @@ def parse_config(G: Type[Config], config: Config):
         if issubclass(val_type, ConfigDetail):
             val = parse(Config, val)
         else:
+            if issubclass(val_type, (list, tuple, set)):
+                val = parse(List[Union[Config, Any]], val)
+
             val = parse(val_type, val)
 
         data[key] = val
