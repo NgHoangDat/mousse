@@ -2,8 +2,8 @@
 
 > Collections of my most used functions, classes and patterns. I was craving for a delicious mousse as I was comming up with the name. I
 
-
 ## Installation
+
 ---
 
 ```sh
@@ -13,7 +13,9 @@ pip install -U mousse
 ## Components
 
 ---
+
 ### Dataclass
+
 > This is a self-implement, minimal version of [pydantic](https://pydantic-docs.helpmanual.io), with some minar changes.
 
 ```py
@@ -58,6 +60,7 @@ print(bar)
 ```
 
 Some helper functions are:
+
 - `validate`: Check data type of variable
 
 ```py
@@ -134,12 +137,12 @@ parse(Foo, {
     "items": [1, 2, 3]
 }) # Foo(name="foo", number=42.2, items=['1', '2', '3'])
 ```
+
 ---
+
 ### Config
 
 > This is how I manage the configuration of my application. By creating a Config object that can be loaded once and refered everywhere. Of course, by default, the Config object cannot be changed by convention means. A changing config during runtime is evil.
-
-#### Usage
 
 ```py
 # entry_point.py
@@ -164,7 +167,10 @@ load_config(
 ```
 
 ```py
-from mousse import get_config
+# anywhere.py
+
+from typing import *
+from mousse import get_config, asdict, asclass, Dataclass
 
 # This can be called anytime
 config = get_config("foo")
@@ -190,5 +196,109 @@ config.foo = "bar"
 # compatible with asdict
 config_data = asdict(config)
 print(config_data)
+# {
+#     "foo": {
+#         "name": "foo",
+#         "number": 42.0,
+#         "items": [
+#             {
+#                 "name": "banana",
+#                 "price": 12
+#             },
+#             {
+#                 "name": "egg",
+#                 "price": 10
+#             }
+#         ]
+#     },
+#     "id": 1
+# }
 
+class Item(Dataclass):
+    name: str
+    price: int
+
+class Foo(Dataclass):
+    name: str
+    number: float
+    items: List[Item]
+
+
+class Bar(Dataclass):
+    foo: Foo
+    id: int
+
+
+# compatible with asclass
+bar = asclass(Bar, config)
+print(bar)
+# Bar(foo=Foo(name="foo", number=42.0, items=[Item(name="banana", price=12), Item(name="egg", price=10)]), id=1)
+```
+
+### Logger
+
+---
+> This module is for managing logging process, with pre-defined logging format and both file logging and stdout logging.
+
+```py
+# entry_point.py
+
+from mousse import init_logger
+
+init_logger(
+    "foo", # key to identify logger,
+    log_dir="logs" # log directory
+)
+```
+
+```py
+# anywhere.py
+
+from mousse import get_logger
+
+logger = get_logger("foo")
+logger.info("This is", "my", "logger number:", 1)
+# [2022-05-09 20:28:04] [43050 4345906560] [INFO] [2678317510.py.<cell line: 1>:1] This is my logger number: 1
+```
+
+The format of the log is:
+
+```txt
+[{date} {time}] [{process_id} {thread_id}] [{level}] [{file}.{lineno}] {msg}
+```
+
+After `init_logger`, log with also be saved to the log directory
+
+### Scheduler
+
+---
+
+> If you ever have the need to run a Python at a specific time, or periodically. This might come handy.
+
+```py
+import asyncio
+from datetime import datetime
+
+from mousse import Scheduler, call_at, call_after
+
+loop = asyncio.get_event_loop()
+
+# This function will be call at 11:05 everyday as long that the loop is still running
+@call_at(loop=loop, repeated=True, hour=11, minute=5)
+def show_actual_runtime(name: str):
+    print(f"Actual time of {name}:", datetime.strftime(datetime.now(), "%y-%m-%d %H:%M:%S"))
+
+
+# This function will be call after every 10 minutes as long as the loop is still running
+@call_after(loop=loop, repeated=True, minutes=10)
+def show_current_runtime(name: str):
+    print(f"Current time of {name}:", datetime.strftime(datetime.now(), "%y-%m-%d %H:%M:%S"))
+
+show_actual_runtime(name="call_now")
+show_current_runtime(name="call_now")
+
+show_actual_runtime.promise(name="call_at")
+show_current_runtime.promis(name="call_after")
+
+loop.run_forever()
 ```

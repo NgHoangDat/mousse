@@ -9,7 +9,7 @@ from logging.handlers import RotatingFileHandler
 from typing import *
 from typing import Callable
 
-__all__ = ["init_logger", "log_error", "log_time", "add_handler"]
+__all__ = ["init_logger", "get_logger", "log_error", "log_time", "add_handler"]
 
 
 FORMATTER = logging.Formatter(
@@ -19,9 +19,12 @@ FORMATTER = logging.Formatter(
 
 
 class LoggerWrapper:
-    def __init__(self, logger: logging.Logger) -> None:
+    def __init__(self, logger: logging.Logger = None) -> None:
         self.logger = logger
-
+        if self.logger is None:
+            self.logger = logging.getLogger()
+            add_handler(logger, StreamHandler())
+ 
     def __gen_msg(self, *msg) -> str:
         buffer = io.StringIO()
         print(*msg, end="", file=buffer)
@@ -54,6 +57,11 @@ class LoggerWrapper:
 
 
 @lru_cache(typed=True)
+def get_logger(*args):
+    return LoggerWrapper()
+
+
+@lru_cache(typed=True)
 def init_logger(
     name: str = "default",
     log_dir: Optional[str] = None,
@@ -75,7 +83,10 @@ def init_logger(
             ),
         )
 
-    return LoggerWrapper(logger)
+    wrapper = get_logger(name)
+    wrapper.logger = logger
+
+    return logger
 
 
 def add_handler(

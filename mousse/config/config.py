@@ -27,10 +27,16 @@ def load_yaml(stream: Any) -> Dict[str, Any]:
 LOADER = {".json": json.load, ".yaml": load_yaml, ".yml": load_yaml}
 
 
-class ConfigDetail:
+class ConfigDetail(Mapping):
     def __iter__(self):
         for _ in range(0):
             yield _
+
+    def __getitem__(self, key: str):
+        return getattr(self, key)
+
+    def __len__(self) -> int:
+        return 0
 
     def __repr__(self):
         components = []
@@ -59,7 +65,7 @@ class ConfigDetailAccessor:
 
     def __get__(self, obj: Any, *args, **kwargs):
         return deepcopy(self.val)
-    
+
     def __set__(self, obj: Any, val: Any):
         container = get_container(obj)
         assert not container.freeze, f"Permission denied"

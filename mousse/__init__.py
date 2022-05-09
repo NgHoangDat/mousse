@@ -13,7 +13,7 @@ from .data import (
     validator,
 )
 from .export import export, export_instance, export_subclass
-from .logger import add_handler, init_logger, log_error, log_time
+from .logger import add_handler, get_logger, init_logger, log_error, log_time
 from .pattern import (
     AutoRegistry,
     Listener,
@@ -51,6 +51,7 @@ __all__ = [
     "export_subclass",
     "get_config",
     "init_logger",
+    "get_logger",
     "load_config",
     "log_error",
     "log_time",

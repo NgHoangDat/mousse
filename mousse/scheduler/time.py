@@ -1,222 +1,310 @@
+from copy import deepcopy
 from datetime import datetime, timedelta
-from functools import partial
 from typing import *
 from typing import Callable
 
 from dateutil.relativedelta import relativedelta
-
-from ..functional import (
-    case,
-    compose,
-    concat,
-    filter,
-    identity,
-    lt,
-    map,
-    mock,
-    peek_nth,
-)
 
 Range = Tuple[int, int]
 Time = Union[int, Range]
 TimeConf = Union[int, Tuple[Time, ...]]
 
 
-def __range(moments: Tuple[int, ...]):
-    return lambda _: range(*moments)
+def log_result(func: Callable):
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        print(func.__name__, result)
+        return result
+
+    return wrapper
 
 
+# @log_result
 def __get_moments(
     next_run_getter: Callable,
+    now: datetime,
     pivot: datetime,
     moments: Tuple[int, ...],
-    multi: bool,
     **kwargs
 ):
-    return compose(
-        tuple,
-        sorted,
-        concat,
-        map(partial(next_run_getter, pivot, multi=False, **kwargs)),
-        case(predicate=identity, action=mock(moments), otherwise=__range(moments)),
-    )(multi)
+    candiates = []
+    for momment in moments:
+        candiate = next_run_getter(now, pivot, momment, **kwargs)
+        if candiate:
+            candiates.append(candiate)
+
+    if candiates:
+        candiates.sort()
+        return candiates.pop(0)
+
+    return None
 
 
-def __move_by_delta(
-    next_run_getter: Callable, pivot: datetime, delta: timedelta, **kwargs
+def __get_closest_time(
+    next_run_getter: Callable,
+    now: datetime,
+    pivot: datetime,
+    delta: timedelta = None,
+    **kwargs
 ):
-    return compose(tuple, sorted)(
-        next_run + delta if pivot > next_run else next_run
-        for next_run in next_run_getter(pivot, multi=True, **kwargs)
-    )
+    print(next_run_getter.__name__, "pivot", now, pivot)
+    while True:
+        next_run = next_run_getter(now, pivot, **kwargs)
+        if next_run and next_run > now:
+            print(next_run_getter.__name__, "next", next_run)
+            return next_run
+
+        if delta is None:
+            return None
+
+        pivot += delta
 
 
+# @log_result
 def get_next_microsecond(
-    now: datetime, microsecond: TimeConf = 0, multi: bool = True, **kwargs
+    now: datetime, pivot: datetime = None, microsecond: TimeConf = 0, **kwargs
 ) -> Tuple[datetime, ...]:
     if type(microsecond) is tuple:
-        return __get_moments(get_next_microsecond, now, microsecond, multi, **kwargs)
+        return __get_moments(get_next_microsecond, now, pivot, microsecond, **kwargs)
     else:
+        pivot = pivot or now
+
         next_run = datetime(
-            year=now.year,
-            month=now.month,
-            day=now.day,
-            hour=now.hour,
-            minute=now.minute,
-            second=now.second,
+            year=pivot.year,
+            month=pivot.month,
+            day=pivot.day,
+            hour=pivot.hour,
+            minute=pivot.minute,
+            second=pivot.second,
             microsecond=microsecond,
         )
-        if now > next_run:
-            next_run += relativedelta(seconds=1)
 
-        return (next_run,)
+        # while now > next_run:
+        #     next_run += relativedelta(seconds=1)
+
+        return next_run
 
 
+# @log_result
 def get_next_second(
-    now: datetime, second: Optional[TimeConf] = None, multi: bool = True, **kwargs
+    now: datetime, pivot: datetime = None, second: Optional[TimeConf] = None, **kwargs
 ) -> Tuple[datetime, ...]:
     if second is not None:
         if type(second) is tuple:
-            return __get_moments(get_next_second, now, second, multi, **kwargs)
+            return __get_moments(get_next_second, now, pivot, second, **kwargs)
         else:
+            pivot = pivot or now
+
             pivot = datetime(
-                year=now.year,
-                month=now.month,
-                day=now.day,
-                hour=now.hour,
-                minute=now.minute,
+                year=pivot.year,
+                month=pivot.month,
+                day=pivot.day,
+                hour=pivot.hour,
+                minute=pivot.minute,
                 second=second,
             )
-            return __move_by_delta(
-                get_next_microsecond, pivot, relativedelta(minutes=1), **kwargs
+            next_run = __get_closest_time(
+                get_next_microsecond, now, pivot, relativedelta(minutes=1), **kwargs
             )
+            if next_run and next_run.second == second:
+                return next_run
 
-    return get_next_microsecond(now, multi=True, **kwargs)
+            return None
+
+    return get_next_microsecond(now, pivot, **kwargs)
 
 
+# @log_result
 def get_next_minute(
-    now: datetime, minute: Optional[TimeConf] = None, multi: bool = True, **kwargs
+    now: datetime, pivot: datetime = None, minute: Optional[TimeConf] = None, **kwargs
 ) -> datetime:
     if minute is not None:
         if type(minute) is tuple:
-            return __get_moments(get_next_minute, now, minute, multi, **kwargs)
+            return __get_moments(get_next_minute, now, pivot, minute, **kwargs)
         else:
+            pivot = pivot or now
+
             pivot = datetime(
-                year=now.year,
-                month=now.month,
-                day=now.day,
-                hour=now.hour,
+                year=pivot.year,
+                month=pivot.month,
+                day=pivot.day,
+                hour=pivot.hour,
                 minute=minute,
             )
-            return __move_by_delta(
-                get_next_second, pivot, relativedelta(hours=1), **kwargs
+            next_run = __get_closest_time(
+                get_next_second, now, pivot, relativedelta(hours=1), **kwargs
             )
-    return get_next_second(now, multi=True, **kwargs)
+            if next_run and next_run.minute == minute:
+                return next_run
+
+            return None
+
+    return get_next_second(now, pivot, **kwargs)
 
 
+# @log_result
 def get_next_hour(
-    now: datetime, hour: Optional[TimeConf] = None, multi: bool = True, **kwargs
+    now: datetime, pivot: datetime = None, hour: Optional[TimeConf] = None, **kwargs
 ) -> datetime:
     if hour is not None:
         if type(hour) is tuple:
-            return __get_moments(get_next_hour, now, hour, multi, **kwargs)
+            return __get_moments(get_next_hour, now, pivot, hour, **kwargs)
         else:
-            pivot = datetime(year=now.year, month=now.month, day=now.day, hour=hour)
-            return __move_by_delta(
-                get_next_minute, pivot, relativedelta(days=1), **kwargs
+            pivot = pivot or now
+
+            pivot = datetime(
+                year=pivot.year, month=pivot.month, day=pivot.day, hour=hour
             )
-    return get_next_minute(now, multi=True, **kwargs)
+            next_run = __get_closest_time(
+                get_next_minute, now, pivot, relativedelta(days=1), **kwargs
+            )
+            if next_run and next_run.hour == hour:
+                return next_run
+
+            return None
+
+    return get_next_minute(now, pivot, **kwargs)
 
 
+# @log_result
 def get_next_day(
-    now: datetime, day: TimeConf = 0, multi: bool = True, **kwargs
+    now: datetime, pivot: datetime = None, day: TimeConf = 0, **kwargs
 ) -> datetime:
     if day:
         if type(day) is tuple:
-            return __get_moments(get_next_day, now, day, multi, **kwargs)
+            return __get_moments(get_next_day, now, pivot, day, **kwargs)
         else:
-            pivot = datetime(year=now.year, month=now.month, day=day)
-            return __move_by_delta(
-                get_next_hour, pivot, relativedelta(months=1), **kwargs
+            pivot = pivot or now
+            pivot = datetime(year=pivot.year, month=pivot.month, day=day)
+            next_run = __get_closest_time(
+                get_next_hour, now, pivot, relativedelta(months=1), **kwargs
             )
-    return get_next_hour(now, multi=True, **kwargs)
+            if next_run and next_run.day == day:
+                return next_run
+
+            return None
+
+    return get_next_hour(now, pivot, **kwargs)
 
 
+# @log_result
 def get_next_weekday(
-    now: datetime, weekday: TimeConf = 0, multi: bool = True, **kwargs
+    now: datetime, pivot: datetime = None, weekday: TimeConf = 0, **kwargs
 ) -> datetime:
     if weekday:
         if type(weekday) is tuple:
-            return __get_moments(get_next_weekday, now, weekday, multi, **kwargs)
+            return __get_moments(get_next_weekday, now, pivot, weekday, **kwargs)
         else:
             weekday = max(weekday - 1, 0)
-            pivot = datetime(year=now.year, month=now.month, day=now.day)
+            pivot = pivot or now
+
+            pivot = datetime(year=pivot.year, month=pivot.month, day=now.day)
             if pivot.weekday() < weekday:
                 pivot += relativedelta(days=weekday - pivot.weekday())
 
             if pivot.weekday() > weekday:
                 pivot += relativedelta(days=7 + weekday - pivot.weekday())
 
-            return __move_by_delta(
-                get_next_hour, pivot, relativedelta(days=7), **kwargs
+            next_run = __get_closest_time(
+                get_next_hour, now, pivot, relativedelta(days=7), **kwargs
             )
-    return get_next_day(now, multi=True, **kwargs)
+            if next_run and next_run.weekday() == weekday:
+                return next_run
+
+            return None
+
+    return get_next_day(now, pivot, **kwargs)
 
 
+# @log_result
 def get_next_week(
-    now: datetime, week: TimeConf = 0, multi: bool = True, **kwargs
+    now: datetime,
+    pivot: datetime = None,
+    week: TimeConf = 0,
+    weekday: TimeConf = 0,
+    **kwargs
 ) -> datetime:
     if week:
         if type(week) is tuple:
-            return __get_moments(get_next_week, now, week, multi, **kwargs)
-        else:
-            pivot = datetime(year=now.year, month=now.month, day=1) + relativedelta(
-                weeks=week - 1
+            return __get_moments(
+                get_next_week, now, pivot, week, weekday=weekday, **kwargs
             )
-            next_runs = get_next_weekday(pivot, multi=True, **kwargs)
-            for i, next_run in enumerate(next_runs):
-                if next_run <= now:
-                    if now.month < 12:
-                        pivot = datetime(year=now.year, month=now.month + 1, day=1)
-                    else:
-                        pivot = datetime(year=now.year + 1, month=1, day=1)
-                    pivot += relativedelta(weeks=week - 1)
-                    next_runs[i] = get_next_weekday(pivot, multi=True, **kwargs)
+        else:
+            pivot = pivot or now
+            pivot = datetime(year=pivot.year, month=pivot.month, day=1)
 
-            return compose(tuple, sorted)(next_runs)
+            if weekday == 0:
+                start_of_week = (
+                    pivot
+                    + relativedelta(weeks=week - 1)
+                    - relativedelta(days=pivot.weekday())
+                )
+                if start_of_week.month == pivot.month:
+                    pivot = start_of_week
 
-    return get_next_weekday(now, multi=True, **kwargs)
+            next_run = __get_closest_time(
+                get_next_weekday,
+                now,
+                pivot,
+                relativedelta(months=1),
+                weekday=weekday,
+                **kwargs
+            )
+            # if next_run is None:
+            #     return None
+
+            # if (next_run - relativedelta(weeks=week)).month >= next_run.month:
+            #     return None
+
+            # if (next_run - relativedelta(weeks=week - 1)).month != next_run.month:
+            #     return None
+
+            return next_run
+
+    return get_next_weekday(now, pivot, weekday=weekday, **kwargs)
 
 
+# @log_result
 def get_next_month(
-    now: datetime, month: TimeConf = 0, multi: bool = True, **kwargs
+    now: datetime, pivot: datetime = None, month: TimeConf = 0, **kwargs
 ) -> datetime:
     if month:
         if type(month) is tuple:
-            return __get_moments(get_next_month, now, month, multi, **kwargs)
+            return __get_moments(get_next_month, now, pivot, month, **kwargs)
         else:
-            pivot = datetime(
-                year=now.year + (1 if now.month > month else 0), month=month, day=1
+            pivot = pivot or now
+            pivot = datetime(year=pivot.year, month=month, day=1)
+            next_run = __get_closest_time(
+                get_next_week, now, pivot, relativedelta(years=1), **kwargs
             )
-            return __move_by_delta(
-                get_next_week, pivot, relativedelta(years=1), **kwargs
-            )
-    return get_next_week(now, multi=True, **kwargs)
+
+            if next_run and next_run.month == month:
+                return next_run
+            return None
+
+    return get_next_week(now, pivot, **kwargs)
 
 
+# @log_result
 def get_next_year(
-    now: datetime, year: int = 0, multi: bool = True, **kwargs
+    now: datetime, pivot: datetime = None, year: int = 0, **kwargs
 ) -> Optional[datetime]:
     if year:
         if type(year) is tuple:
-            return __get_moments(get_next_year, now, year, multi, **kwargs)
+            return __get_moments(get_next_year, now, pivot, year, **kwargs)
         else:
+            if now.year > year:
+                return None
+
             pivot = datetime(year=year, month=1, day=1)
-            return compose(tuple, filter(lt(now)), __move_by_delta)(
-                get_next_month, pivot, relativedelta(), **kwargs
-            )
-    return get_next_month(now, multi=True, **kwargs)
+            next_run = __get_closest_time(get_next_month, now, pivot, None, **kwargs)
+
+            if next_run and next_run.year == year:
+                return next_run
+            return None
+
+    return get_next_month(now, pivot, **kwargs)
 
 
 def get_next_runtime(now: datetime, **kwargs) -> Optional[datetime]:
-    return compose(peek_nth(0), get_next_year)(now, **kwargs)
+    return get_next_year(now, **kwargs)
