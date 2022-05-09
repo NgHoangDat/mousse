@@ -1,11 +1,10 @@
+import collections
 from typing import *
-from typing import _GenericAlias, _SpecialForm
 
 from .dataclass import Dataclass
 from .field import Field, get_fields_info
 from .validator import validate
-
-Generic = Union[_GenericAlias, _SpecialForm]
+from .types import get_args, get_origin, Generic
 
 __all__ = ["Parser", "asdict", "asclass", "parse", "parser"]
 
@@ -32,10 +31,9 @@ def parser(*types: Type[Generic], func: Callable = None):
 def parse(G: Union[Generic, Type], obj: Any):
     if isinstance(G, get_args(Generic)):
         origin = get_origin(G)
-        assert origin in parsers, f"No parser found for {origin}"
-
-        parser = parsers[origin]
-        return parser(G, obj)
+        if origin in parsers:
+            parser = parsers[origin]
+            return parser(G, obj)
 
     if G in parsers:
         parser = parsers[G]
@@ -45,8 +43,8 @@ def parse(G: Union[Generic, Type], obj: Any):
         return obj
 
     if issubclass(G, Dataclass):
-        assert isinstance(obj, dict), f"Unable to parse from {type(obj)} to {G}"
-        return G(**obj)
+        if isinstance(obj, dict):
+            return G(**obj)
 
     return G(obj)
 
@@ -63,8 +61,10 @@ def parse_none(G: Generic, obj: Any):
 
 @parser(List, Set, Sequence)
 def parse_sequence(G: Generic, obj: Any):
-    arg, *_ = get_args(G)
-    origin = get_origin(G)
+    arg, *_ = get_args(G) + (Any,)
+    origin = get_origin(G) or G
+    if origin is collections.abc.Sequence:
+        origin = list
 
     assert validate(Iterable, obj), f"Object is not an iterable"
     return origin(parse(arg, elem) for elem in obj)
@@ -135,7 +135,7 @@ class Parser(metaclass=ParserMetaclass):
 
 class DictParser(Parser):
     def __call__(self, val: Any, field: Field):
-        if isinstance(field.annotation, _GenericAlias):
+        if isinstance(field.annotation, Generic):
             val = parse(get_origin(field.annotation), val)
 
         return val
@@ -175,7 +175,7 @@ def asdict(obj: Dataclass, by_alias: bool = True, parser: Parser = DictParser())
 
 
 def asclass(cls: Type[Dataclass], obj: Any, parser: Parser = ClassParser()):
-    assert isinstance(obj, dict), f"Unable to convert {type(obj)} to {cls}"
+    assert issubclass(type(obj), Mapping), f"Unable to convert {type(obj)} to {cls}"
     fields: Dict[str, Field] = get_fields_info(cls)
 
     alias = {}
@@ -183,5 +183,6 @@ def asclass(cls: Type[Dataclass], obj: Any, parser: Parser = ClassParser()):
         if field.alias is not None:
             alias[field.alias] = key
 
-    obj = {alias.get(key, key): val for key, val in obj.items()}
-    return cls(**{key: parser(val, fields[key]) for key, val in obj.items()})
+    data = {**obj}
+    data = {alias.get(key, key): val for key, val in data.items() if key in fields}
+    return cls(**{key: parser(val, fields[key]) for key, val in data.items()})

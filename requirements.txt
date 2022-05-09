@@ -1,1 +1,3 @@
 toolz
+pyyaml
+python-dateutil

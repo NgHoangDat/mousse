@@ -7,6 +7,7 @@ from typing import Callable
 class Task:
     def __init__(self):
         self.state: str = "idle"
+        self.schedule = None
         self.handle: Optional[asyncio.Handle] = None
 
     def cancel(self, *args, **kwargs):

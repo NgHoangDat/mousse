@@ -9,7 +9,6 @@ class Accessor:
     def __init__(
         self,
         key: str,
-        /,
         field: Field = None,
         validators: List[str] = None,
         strict: bool = False,

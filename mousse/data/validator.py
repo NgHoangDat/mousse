@@ -1,8 +1,7 @@
 import inspect
 from typing import *
-from typing import _GenericAlias, _SpecialForm
 
-Generic = Union[_GenericAlias, _SpecialForm]
+from .types import Generic, get_args, get_origin
 
 __all__ = ["validator", "Validator", "validate"]
 

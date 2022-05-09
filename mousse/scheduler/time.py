@@ -46,7 +46,7 @@ def __move_by_delta(
     next_run_getter: Callable, pivot: datetime, delta: timedelta, **kwargs
 ):
     return compose(tuple, sorted)(
-        next_run + delta if pivot >= next_run else next_run
+        next_run + delta if pivot > next_run else next_run
         for next_run in next_run_getter(pivot, multi=True, **kwargs)
     )
 
@@ -68,6 +68,7 @@ def get_next_microsecond(
         )
         if now > next_run:
             next_run += relativedelta(seconds=1)
+
         return (next_run,)
 
 

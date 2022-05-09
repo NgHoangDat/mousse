@@ -10,6 +10,9 @@ from .types import Task
 from .time import get_next_runtime
 
 
+__all__ = ["Scheduler", "call_after", "call_at"]
+
+
 class Scheduler:
     def __init__(self, loop: asyncio.AbstractEventLoop):
         self.loop = loop
@@ -47,7 +50,12 @@ class Scheduler:
             action()
 
 
-def call_at(loop: asyncio.AbstractEventLoop, repeated: bool = False, **timedetail):
+def call_at(
+    loop: asyncio.AbstractEventLoop = None, repeated: bool = False, **timedetail
+):
+    if loop is None:
+        loop = asyncio.get_event_loop()
+
     def decorator(func, **options):
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> Task:
@@ -60,11 +68,13 @@ def call_at(loop: asyncio.AbstractEventLoop, repeated: bool = False, **timedetai
 
             def reschedule():
                 task.set_state("pending")
-                next_run = get_next_runtime(datetime.now(), **timedetail)
+                task.schedule = get_next_runtime(datetime.now(), **timedetail)
 
-                if next_run:
+                if task.schedule:
                     timestamp = (
-                        next_run.timestamp() - datetime.now().timestamp() + loop.time()
+                        task.schedule.timestamp()
+                        - datetime.now().timestamp()
+                        + loop.time()
                     )
                     task.handle = loop.call_at(when=timestamp, callback=run)
                 else:

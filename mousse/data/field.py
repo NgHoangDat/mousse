@@ -9,7 +9,6 @@ class Field:
     def __init__(
         self,
         default: Any = Ellipsis,
-        /,
         alias: str = None,
         freeze: bool = False,
         exclude: bool = None,

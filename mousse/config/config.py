@@ -12,12 +12,12 @@ from typing import Callable
 
 from yaml import Loader, load
 
-from ..data import parser, parse
+from ..data import Dataclass, asdict, parse, parser
 from ..scheduler import call_after
 
 NoneType = type(None)
 
-__all__ = ["get_config", "load_config", "Config"]
+__all__ = ["get_config", "load_config", "watch", "watch_async", "Config"]
 
 
 def load_yaml(stream: Any) -> Dict[str, Any]:
@@ -31,6 +31,20 @@ class ConfigDetail:
     def __iter__(self):
         for _ in range(0):
             yield _
+
+    def __repr__(self):
+        components = []
+        for key in self:
+            val = getattr(self, key)
+            
+        if type(val) is str:
+            components.append(f"{key}=\"{val}\"")
+        else:
+            components.append(f"{key}={val}")
+
+        components = ", ".join(components)
+
+        return f"Config({components})"
 
 
 class ConfigDetailContainer:
@@ -52,7 +66,7 @@ def get_container(ins: Any):
     return ConfigDetailContainer()
 
 
-class Config:
+class Config(Mapping):
     def __getattribute__(self, key: str):
         container = get_container(self)
         if hasattr(container.detail, key):
@@ -70,57 +84,82 @@ class Config:
 
     def __iter__(self):
         container = get_container(self)
-        for item in container.detail:
-            yield item
+        for key in container.detail:
+            yield key
 
-    async def watch_async(
-        self,
-        loop: asyncio.AbstractEventLoop,
-        emitter: Callable,
-        refresh: bool = True,
-        logger: Optional[logging.Logger] = None,
-        **timedetail,
-    ):
+    def __getitem__(self, key: str):
+        container = get_container(self)
+        return getattr(container.detail, key)
 
-        if not asyncio.iscoroutinefunction(emitter):
-            emitter = asyncio.coroutine(emitter)
+    def __len__(self) -> int:
+        container = get_container(self)
+        return len(container)
 
-        @call_after(loop, repeated=refresh, **timedetail)
-        async def observer(ignore_exception: bool = True):
+    def __hash__(self):
+        return id(self)
+
+    def __repr__(self):
+        components = []
+        for key in self:
+            val = getattr(self, key)
+            if type(val) is str:
+                components.append(f"{key}=\"{val}\"")
+            else:
+                components.append(f"{key}={val}")
+
+        components = ", ".join(components)
+        return f"Config({components})"
+
+
+async def watch_async(
+    config: Config,
+    loop: asyncio.AbstractEventLoop,
+    emitter: Callable,
+    refresh: bool = True,
+    logger: Optional[logging.Logger] = None,
+    **timedetail,
+):
+
+    if not asyncio.iscoroutinefunction(emitter):
+        emitter = asyncio.coroutine(emitter)
+
+    @call_after(loop, repeated=refresh, **timedetail)
+    async def observer(ignore_exception: bool = True):
+        try:
+            data = await emitter()
+            update(config, **data)
+        except Exception as e:
+            if not ignore_exception:
+                raise e
+
+            if logger:
+                logger.error(e)
+
+    await observer(ignore_exception=False)
+    observer.promise(ignore_exception=True)
+
+
+def watch(
+    config: Config,
+    emitter: Callable,
+    logger: Optional[logging.Logger] = None,
+    **timedetail,
+):
+    timestamp = timedelta(**timedetail).total_seconds()
+
+    def observer():
+        while True:
+            time.sleep(timestamp)
             try:
-                data = await emitter()
-                update(self, **data)
+                update(config, **emitter())
             except Exception as e:
-                if not ignore_exception:
-                    raise e
-
                 if logger:
                     logger.error(e)
 
-        await observer(ignore_exception=False)
-        observer.promise(ignore_exception=True)
-
-    def watch(
-        self,
-        emitter: Callable,
-        logger: Optional[logging.Logger] = None,
-        **timedetail,
-    ):
-        timestamp = timedelta(**timedetail).total_seconds()
-
-        def observer():
-            while True:
-                time.sleep(timestamp)
-                try:
-                    update(self, **emitter())
-                except Exception as e:
-                    if logger:
-                        logger.error(e)
-
-        update(self, **emitter())
-        task = Thread(target=observer)
-        task.daemon = True
-        task.start()
+    update(config, **emitter())
+    task = Thread(target=observer)
+    task.daemon = True
+    task.start()
 
 
 def asdetail(obj: Any):
@@ -129,9 +168,13 @@ def asdetail(obj: Any):
 
         def __iter__(self):
             for key in obj:
-                yield key, getattr(self, key)
+                yield key
+
+        def __len__(self):
+            return len(obj)
 
         data["__iter__"] = __iter__
+        data["__len__"] = __len__
 
         return type("ConfigDetail", (ConfigDetail,), data)()
 
@@ -148,12 +191,17 @@ def update(config: Config, **kwargs):
 
     def __iter__(self):
         for key in detail:
-            yield key, getattr(detail, key)
+            yield key
 
         for key in kwargs:
-            yield key, getattr(self, key)
+            yield key
+
+    def __len__(self):
+        return len(detail) + len(kwargs)
 
     data["__iter__"] = __iter__
+    data["__len__"] = __len__
+
     container.detail = type("ConfigDetail", (type(detail),), data)()
 
 
@@ -170,7 +218,8 @@ def unfreeze(config: Config):
 @parser(Config)
 def parse_config(G: Type[Config], config: Config):
     data = {}
-    for key, val in config:
+    for key in config:
+        val = getattr(config, key)
         val_type = type(val)
         if issubclass(val_type, ConfigDetail):
             val = parse(Config, val)
