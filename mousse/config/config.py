@@ -236,6 +236,7 @@ def get_config(*args, **kwargs):
     return Config()
 
 
+@lru_cache(typed=True)
 def load_config(*args, path: Union[str, Path, NoneType] = None, **kwargs):
     params = {}
 
