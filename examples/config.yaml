@@ -1,0 +1,10 @@
+foo:
+  name: foo
+  number: 42.0
+  items:
+    - name: banana
+      price: 12
+    - name: egg
+      price: 10
+  tokens: [1, 2, 3]
+id: 1

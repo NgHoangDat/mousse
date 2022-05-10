@@ -1,5 +1,6 @@
 .vscode
-env*
+env
+denv
 dist
 build
 __pycache__

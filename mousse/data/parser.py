@@ -56,6 +56,9 @@ def parse(G: Union[Generic, Type], obj: Any):
     if issubclass(G, Dataclass):
         return asclass(G, obj)
 
+    if obj is Ellipsis:
+        return G()
+
     return G(obj)
 
 
