@@ -1,6 +1,6 @@
 # Mousse
 
-> Collections of my most used functions, classes and patterns. I was craving for a delicious mousse as I was comming up with the name. I
+> Collections of my most used functions, classes and patterns. I was craving for a delicious mousse as I was comming up with the name.
 
 ## Installation
 
@@ -16,7 +16,7 @@ pip install -U mousse
 
 ### Dataclass
 
-> This is a self-implement, minimal version of [pydantic](https://pydantic-docs.helpmanual.io), with some minar changes.
+> This is a self-implement, minimal version of [pydantic](https://pydantic-docs.helpmanual.io), with some minor changes.
 
 ```py
 from typing import *
