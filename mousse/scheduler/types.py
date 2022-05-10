@@ -11,6 +11,7 @@ class State(str, Enum):
     running: str = "running"
     finish: str = "finish"
 
+
 class Task:
     def __init__(self):
         self.state: State = State.idle

@@ -82,7 +82,6 @@ def call_at(
             def reschedule():
                 task.set_state(State.pending)
                 task.schedule = get_next_runtime(datetime.now(), **timedetail)
-                print(task.schedule)
 
                 if task.schedule:
                     timestamp = (
@@ -111,7 +110,12 @@ def call_at(
     return decorator
 
 
-def call_after(loop: asyncio.AbstractEventLoop, repeated: bool = False, **timedetail):
+def call_after(
+    loop: asyncio.AbstractEventLoop = None, repeated: bool = False, **timedetail
+):
+    if loop is None:
+        loop = asyncio.get_event_loop()
+
     def decorator(func, **options):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):

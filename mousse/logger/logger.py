@@ -23,8 +23,8 @@ class LoggerWrapper:
         self.logger = logger
         if self.logger is None:
             self.logger = logging.getLogger()
-            add_handler(logger, StreamHandler())
- 
+            add_handler(self.logger, StreamHandler())
+
     def __gen_msg(self, *msg) -> str:
         buffer = io.StringIO()
         print(*msg, end="", file=buffer)
@@ -68,10 +68,10 @@ def init_logger(
     max_bytes: int = 10000000,
     backup_count: int = 5,
     level: int = logging.INFO,
-) -> logging.Logger:
-    logger = logging.getLogger(name)
+) -> logging.Logger:    
+    wrapper = get_logger(name)
+    logger = wrapper.logger
     logger.setLevel(level)
-    add_handler(logger, StreamHandler())
 
     if log_dir is not None:
         os.makedirs(log_dir, exist_ok=True)
@@ -83,10 +83,7 @@ def init_logger(
             ),
         )
 
-    wrapper = get_logger(name)
-    wrapper.logger = logger
-
-    return logger
+    return wrapper
 
 
 def add_handler(
