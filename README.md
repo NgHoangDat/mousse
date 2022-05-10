@@ -115,7 +115,7 @@ from mousse import parse, Dataclass
 class Foo(Dataclass):
     name: str
     number: float
-    items: List[str] = []s
+    items: List[str] = []
 
 parse(float, 1) # 1.0
 parse(Union[int, float], 1) # 1
