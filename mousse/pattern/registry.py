@@ -1,9 +1,8 @@
-from functools import partial
+from functools import partial, lru_cache
 from typing import *
 
 
 __all__ = ["Registry", "AutoRegistry", "register"]
-
 
 class Registry:
     __GLOBAl_REGISTRIES: Dict[str, "Registry"] = {}
@@ -46,6 +45,8 @@ class Registry:
 
     @classmethod
     def get(cls, key: str):
+        if key not in cls.__GLOBAl_REGISTRIES:
+            cls.set(key, cls())
         return cls.__GLOBAl_REGISTRIES[key]
 
     @classmethod
@@ -64,11 +65,18 @@ class AutoRegistry(type):
         name: str,
         bases: Tuple[Type, ...],
         namespace: Dict[str, Any],
-        registry: str = "default",
+        registry: str = None,
         **kwargs,
     ):
         new_cls = super().__new__(cls, name, bases, namespace)
+        if registry is None:
+            for base in bases:
+                if hasattr(base, "__REGISTRY__"):
+                    registry = getattr(base, "__REGISTRY__")
+                    break
+
         Registry.get(registry).register(target=new_cls)
+        setattr(new_cls, "__REGISTRY__", registry)
         return new_cls
 
 

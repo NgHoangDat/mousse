@@ -1,6 +1,5 @@
 from copy import copy, deepcopy
 from inspect import Parameter, Signature
-from pathlib import Path
 from typing import *
 
 from .accessor import Accessor
@@ -68,7 +67,7 @@ class DataMetaclass(type):
 
         def __init__(self, *args, **kwargs):
             for key, val in kwargs.items():
-                if key in keys:
+                if key in get_fields_info(self.__class__):
                     setattr(self, key, val)
 
             if hasattr(self, "__build__"):
@@ -80,7 +79,7 @@ class DataMetaclass(type):
             result = cls.__new__(cls)
             result.__dict__.update(self.__dict__)
 
-            for key in keys:
+            for key in get_fields_info(cls):
                 val = getattr(self, key)
                 setattr(result, key, copy(val))
 
@@ -94,19 +93,30 @@ class DataMetaclass(type):
             for k, v in self.__dict__.items():
                 setattr(result, k, deepcopy(v, memo))
 
-            for key in keys:
+            for key in get_fields_info(cls):
                 val = getattr(self, key)
                 setattr(result, key, deepcopy(val))
 
             return result
+        
+        def __getstate__(self):
+            from .parser import asdict
+            return asdict(self)
+        
+        def __setstate__(self, state: Dict[str, Any]):
+            from .parser import asclass
+            new = asclass(self.__class__, state)
+            for key in get_fields_info(self.__class__):
+                val = getattr(new, key)
+                setattr(self, key, val)
 
         def __iter__(self):
-            for key in keys:
+            for key in get_fields_info(self.__class__):
                 yield key, getattr(self, key)
 
         def __repr__(self):
             components = []
-            for key in keys:
+            for key in get_fields_info(self.__class__):
                 val = getattr(self, key)
                 if isinstance(val, str):
                     components.append(f'{key}="{val}"')
@@ -122,13 +132,19 @@ class DataMetaclass(type):
         data["__init__"] = __init__
         data["__copy__"] = __copy__
         data["__deepcopy__"] = __deepcopy__
+        data["__getstate__"] = __getstate__
+        data["__setstate__"] = __setstate__
         data["__iter__"] = __iter__
         data["__repr__"] = __repr__
 
         cls = super().__new__(cls, name, bases, data)
         fields_info = get_fields_info(cls)
-        fields_info.update(fields)
 
+        for base in bases[::-1]:
+            if issubclass(base, Dataclass):
+                fields_info.update(get_fields_info(base))
+
+        fields_info.update(fields)
         return cls
 
 

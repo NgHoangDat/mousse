@@ -59,6 +59,9 @@ def parse(G: Union[Generic, Type], obj: Any):
     if obj is Ellipsis:
         return G()
 
+    if obj is None:
+        return obj
+
     return G(obj)
 
 
@@ -116,7 +119,6 @@ def parse_tuple(G: Generic, obj: Any):
 @parser(Dict)
 def parse_dict(G: Generic, obj: Any):
     assert issubclass(type(obj), dict), f"Unable to parse from {type(obj)} to {G}"
-
     key_type, val_type = get_args(G)
     return {parse(key_type, key): parse(val_type, val) for key, val in obj.items()}
 
@@ -151,8 +153,14 @@ class Parser(metaclass=ParserMetaclass):
 
 class DictParser(Parser):
     def __call__(self, val: Any, field: Field):
+        if val == Ellipsis:
+            return val
+        
         if isinstance(field.annotation, get_args(Generic)):
-            val = parse(get_origin(field.annotation), val)
+            if getattr(field.annotation, "_name", None) == "Dict":
+                return parse(field.annotation, val)
+
+            return parse(get_origin(field.annotation), val)
 
         return val
 
@@ -199,7 +207,8 @@ def asdict(obj: Dataclass, by_alias: bool = True, parser: Parser = DictParser())
         val = parser(val, field)
 
         key = field.alias if by_alias and field.alias is not None else key
-        dictionary[key] = val
+        if val != Ellipsis:
+            dictionary[key] = val
 
     return dictionary
 
