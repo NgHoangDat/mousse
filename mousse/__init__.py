@@ -25,7 +25,7 @@ from .pattern import (
     register,
     singleton,
 )
-from .scheduler import Scheduler, call_after, call_at
+from .scheduler import Scheduler, call_after, call_at, Schedulable, schedulable
 
 __all__ = [
     "Accessor",
@@ -64,4 +64,6 @@ __all__ = [
     "validator",
     "watch",
     "watch_async",
+    "Schedulable",
+    "schedulable",
 ]

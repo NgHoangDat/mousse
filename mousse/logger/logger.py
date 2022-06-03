@@ -38,7 +38,7 @@ class LoggerWrapper:
             f_prev = caller.f_back
             if f_prev is not None:
                 caller = f_prev
-                
+
         filepath = Path(caller.f_code.co_filename)
         filename = f"{filepath.parent}/{filepath.stem}"
 

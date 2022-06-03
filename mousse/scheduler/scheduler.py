@@ -1,14 +1,14 @@
 import asyncio
 import functools
 from datetime import datetime, timedelta
-from functools import partial
+from functools import partial, wraps
 from typing import *
 from typing import Callable
 
 from .time import get_next_runtime
 from .types import Task, State
 
-__all__ = ["Scheduler", "call_after", "call_at"]
+__all__ = ["Scheduler", "call_after", "call_at", "Schedulable", "schedulable"]
 
 
 class Scheduler:
@@ -18,15 +18,15 @@ class Scheduler:
         self.actions: List[Callable] = []
 
     def schedule(
-        self, caller: Optional[Callable], repeated: bool = False, **timedetail
+        self,
+        caller: Optional[Callable],
+        repeated: Union[bool, int] = False,
+        **timedetail
     ):
         def decorator(func: Callable):
             handle = func
 
             for key, value in func.__annotations__.items():
-                if value is Task:
-                    handle = partial(handle, **{key: task})
-
                 if value is Scheduler:
                     handle = partial(handle, **{key: self})
 
@@ -64,7 +64,9 @@ class Scheduler:
 
 
 def call_at(
-    loop: asyncio.AbstractEventLoop = None, repeated: bool = False, **timedetail
+    loop: asyncio.AbstractEventLoop = None,
+    repeated: Union[bool, int] = False,
+    **timedetail
 ):
     if loop is None:
         loop = asyncio.get_event_loop()
@@ -79,7 +81,7 @@ def call_at(
 
             task = Task()
 
-            def reschedule():
+            def reschedule(num_repeated: Union[bool, int]):
                 task.set_state(State.pending)
                 task.schedule = get_next_runtime(datetime.now(), **timedetail)
 
@@ -89,19 +91,25 @@ def call_at(
                         - datetime.now().timestamp()
                         + loop.time()
                     )
-                    task.handle = loop.call_at(when=timestamp, callback=run)
+                    task.handle = loop.call_at(timestamp, run, num_repeated)
                 else:
                     task.set_state(State.finish)
 
-            def run():
+            def run(num_repeated: Union[bool, int]):
                 task.set_state(State.running)
                 future = asyncio.ensure_future(action(), loop=loop)
-                if repeated:
-                    future.add_done_callback(lambda _: reschedule())
+                if num_repeated:
+                    future.add_done_callback(
+                        lambda _: reschedule(
+                            num_repeated
+                            if type(num_repeated) is bool
+                            else num_repeated - 1
+                        )
+                    )
                 else:
                     future.add_done_callback(lambda _: task.set_state(State.finish))
 
-            reschedule()
+            reschedule(repeated if type(repeated) is bool else repeated - 1)
             return task
 
         setattr(func, "promise", wrapper)
@@ -111,7 +119,9 @@ def call_at(
 
 
 def call_after(
-    loop: asyncio.AbstractEventLoop = None, repeated: bool = False, **timedetail
+    loop: asyncio.AbstractEventLoop = None,
+    repeated: Union[bool, int] = False,
+    **timedetail
 ):
     if loop is None:
         loop = asyncio.get_event_loop()
@@ -126,23 +136,74 @@ def call_after(
 
             task = Task()
 
-            def reschedule():
+            def reschedule(num_repeated: Union[bool, int]):
                 task.set_state(State.pending)
                 timestamp = timedelta(**timedetail).total_seconds()
-                task.handle = loop.call_later(delay=timestamp, callback=run)
+                task.handle = loop.call_later(timestamp, run, num_repeated)
 
-            def run():
+            def run(num_repeated: Union[bool, int]):
                 task.set_state(State.running)
                 future = asyncio.ensure_future(action(), loop=loop)
-                if repeated:
-                    future.add_done_callback(lambda _: reschedule())
+                if num_repeated:
+                    future.add_done_callback(
+                        lambda _: reschedule(
+                            num_repeated
+                            if type(num_repeated) is bool
+                            else num_repeated - 1
+                        )
+                    )
                 else:
                     future.add_done_callback(lambda _: task.set_state(State.finish))
 
-            reschedule()
+            reschedule(repeated if type(repeated) is bool else repeated - 1)
             return task
 
         setattr(func, "promise", wrapper)
         return func
 
     return decorator
+
+
+class Schedulable:
+    def __init__(self, func: Callable):
+        self.func = func
+        self.reset()
+
+    def reset(self) -> "Schedulable":
+        self.timedetail = {}
+        self.loop = None
+        self.caller = None
+        self.repeated = False
+        return self
+
+    def at(self, repeated: Union[bool, int] = False, **timedetail) -> "Schedulable":
+        self.timedetail = timedetail
+        self.repeated = repeated
+        self.caller = call_at
+        return self
+
+    def after(self, repeated: Union[bool, int] = False, **timedetail) -> "Schedulable":
+        self.timedetail = timedetail
+        self.repeated = repeated
+        self.caller = call_after
+        return self
+
+    def within(self, loop: asyncio.AbstractEventLoop) -> "Schedulable":
+        self.loop = loop
+        return self
+
+    def __call__(self, *args, **kwargs):
+        return self.func(*args, **kwargs)
+
+    def call(self, *args, **kwargs) -> Task:
+        loop = self.loop or asyncio.get_running_loop()
+        task = self.caller(loop=loop, repeated=self.repeated, **self.timedetail)(
+            self.func
+        )
+        return task.promise(*args, **kwargs)
+
+
+def schedulable(func: Callable) -> Schedulable:
+    wrapper = Schedulable(func)
+    wrapper = wraps(func)(wrapper)
+    return wrapper

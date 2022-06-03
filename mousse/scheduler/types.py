@@ -25,3 +25,9 @@ class Task:
 
     def set_state(self, state: State, *args, **kwargs):
         self.state = state
+
+    async def wait(self, interval: float = 1):
+        while True:
+            await asyncio.sleep(interval)
+            if self.state in (State.canncel, State.finish):
+                break
