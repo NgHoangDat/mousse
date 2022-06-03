@@ -155,7 +155,7 @@ class DictParser(Parser):
     def __call__(self, val: Any, field: Field):
         if val == Ellipsis:
             return val
-        
+
         if isinstance(field.annotation, get_args(Generic)):
             if getattr(field.annotation, "_name", None) == "Dict":
                 return parse(field.annotation, val)

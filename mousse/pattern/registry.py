@@ -4,6 +4,7 @@ from typing import *
 
 __all__ = ["Registry", "AutoRegistry", "register"]
 
+
 class Registry:
     __GLOBAl_REGISTRIES: Dict[str, "Registry"] = {}
 
