@@ -98,13 +98,15 @@ class DataMetaclass(type):
                 setattr(result, key, deepcopy(val))
 
             return result
-        
+
         def __getstate__(self):
             from .parser import asdict
+
             return asdict(self)
-        
+
         def __setstate__(self, state: Dict[str, Any]):
             from .parser import asclass
+
             new = asclass(self.__class__, state)
             for key in get_fields_info(self.__class__):
                 val = getattr(new, key)

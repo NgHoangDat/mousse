@@ -3,6 +3,7 @@ env*
 denv
 dist
 build
+logs
 __pycache__
 *.egg-info
 notebook
