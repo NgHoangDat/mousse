@@ -224,7 +224,7 @@ def asclass(
     if path is not None:
         if type(path) is not Path:
             path = Path(path).resolve()
-            obj = load(path)
+        obj = load(path)
 
     assert issubclass(type(obj), Mapping), f"Unable to convert {type(obj)} to {cls}"
     fields: Dict[str, Field] = get_fields_info(cls)
