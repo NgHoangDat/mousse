@@ -1,3 +1,4 @@
+import os
 import collections
 import json
 from pathlib import Path
@@ -39,22 +40,22 @@ def parser(*types: Type[Generic], func: Callable = None):
     return decorator
 
 
-def parse(G: Union[Generic, Type], obj: Any):
+def parse(G: Union[Generic, Type], obj: Any, **kwargs):
     if isinstance(G, get_args(Generic)):
         origin = get_origin(G)
         if origin in parsers:
             parser = parsers[origin]
-            return parser(G, obj)
+            return parser(G, obj, **kwargs)
 
     if G in parsers:
         parser = parsers[G]
-        return parser(G, obj)
+        return parser(G, obj, **kwargs)
 
     if isinstance(obj, G):
         return obj
 
     if issubclass(G, Dataclass):
-        return asclass(G, obj)
+        return asclass(G, obj, **kwargs)
 
     if obj is Ellipsis:
         return G()
@@ -66,28 +67,28 @@ def parse(G: Union[Generic, Type], obj: Any):
 
 
 @parser(Any)
-def parse_any(G: Generic, obj: Any):
+def parse_any(G: Generic, obj: Any, **kwargs):
     return obj
 
 
 @parser(type(None))
-def parse_none(G: Generic, obj: Any):
+def parse_none(G: Generic, obj: Any, **kwargs):
     return None
 
 
 @parser(List, Set, Sequence)
-def parse_sequence(G: Generic, obj: Any):
+def parse_sequence(G: Generic, obj: Any, **kwargs):
     arg, *_ = get_args(G) + (Any,)
     origin = get_origin(G) or G
     if origin is collections.abc.Sequence:
         origin = list
 
     assert validate(Iterable, obj), f"Object is not an iterable"
-    return origin(parse(arg, elem) for elem in obj)
+    return origin(parse(arg, elem, **kwargs) for elem in obj)
 
 
 @parser(Tuple)
-def parse_tuple(G: Generic, obj: Any):
+def parse_tuple(G: Generic, obj: Any, **kwargs):
     if G is tuple:
         return tuple(obj)
 
@@ -100,7 +101,7 @@ def parse_tuple(G: Generic, obj: Any):
     curr_idx = 0
     data = []
     for i, elem in enumerate(obj):
-        data.append(parse(args[curr_idx], elem))
+        data.append(parse(args[curr_idx], elem, **kwargs))
 
         if i < len(obj) - 1:
             if curr_idx + 1 < len(args):
@@ -117,18 +118,21 @@ def parse_tuple(G: Generic, obj: Any):
 
 
 @parser(Dict)
-def parse_dict(G: Generic, obj: Any):
+def parse_dict(G: Generic, obj: Any, **kwargs):
     assert issubclass(type(obj), dict), f"Unable to parse from {type(obj)} to {G}"
     key_type, val_type = get_args(G)
-    return {parse(key_type, key): parse(val_type, val) for key, val in obj.items()}
+    return {
+        parse(key_type, key, **kwargs): parse(val_type, val, **kwargs)
+        for key, val in obj.items()
+    }
 
 
 @parser(Union)
-def parse_union(G: Generic, obj: Any):
+def parse_union(G: Generic, obj: Any, **kwargs):
     args = get_args(G)
     for arg in args:
         try:
-            return parse(arg, obj)
+            return parse(arg, obj, **kwargs)
         except Exception as e:
             continue
 
@@ -147,27 +151,27 @@ class ParserMetaclass(type):
 
 
 class Parser(metaclass=ParserMetaclass):
-    def __call__(self, val: Any, field: Field) -> Any:
+    def __call__(self, val: Any, field: Field, **kwargs) -> Any:
         return val
 
 
 class DictParser(Parser):
-    def __call__(self, val: Any, field: Field):
+    def __call__(self, val: Any, field: Field, **kwargs):
         if val == Ellipsis:
             return val
 
         if isinstance(field.annotation, get_args(Generic)):
             if getattr(field.annotation, "_name", None) == "Dict":
-                return parse(field.annotation, val)
+                return parse(field.annotation, val, **kwargs)
 
-            return parse(get_origin(field.annotation), val)
+            return parse(get_origin(field.annotation), val, **kwargs)
 
         return val
 
 
 class ClassParser(Parser):
-    def __call__(self, val: Any, field: Field) -> Any:
-        return parse(field.annotation, val)
+    def __call__(self, val: Any, field: Field, **kwargs) -> Any:
+        return parse(field.annotation, val, **kwargs)
 
 
 def load(path: Union[str, Path]) -> Dict[str, Any]:
@@ -217,28 +221,43 @@ def asclass(
     cls: Type[Dataclass],
     obj: Any = None,
     path: Union[str, Path] = None,
+    env: str = None,
     parser: Parser = ClassParser(),
 ):
-    assert (obj is not None) ^ (path is not None), f"Only use obj or path at once"
+    fields: Dict[str, Field] = get_fields_info(cls)
+    alias = {}
+    for key, field in fields.items():
+        alias[field.alias if field.alias is not None else key] = key
 
+    local_obj = obj or {}
+
+    path_obj = {}
     if path is not None:
         if type(path) is not Path:
             path = Path(path).resolve()
-        obj = load(path)
+        path_obj = load(path)
 
-    assert issubclass(type(obj), Mapping), f"Unable to convert {type(obj)} to {cls}"
-    fields: Dict[str, Field] = get_fields_info(cls)
+    env_obj = {}
+    print(env)
+    if env:
+        for key, val in os.environ.items():
+            if key.startswith(env + "_"):
+                key = key[len(env) + 1 :]
+                if key in alias:
+                    key = alias[key]
+                    env_obj[key] = val
 
-    alias = {}
-    for key, field in fields.items():
-        if field.alias is not None:
-            alias[field.alias] = key
-
-    data = {**obj}
+    print(env_obj)
+    data = {**env_obj, **path_obj, **local_obj}
     data = {
         alias.get(key, key): val
         for key, val in data.items()
         if alias.get(key, key) in fields
     }
 
-    return cls(**{key: parser(val, fields[key]) for key, val in data.items()})
+    data = {
+        key: parser(val, fields[key])
+        for key, val in data.items()
+    }
+
+    return cls(**data)
