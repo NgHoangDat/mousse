@@ -41,17 +41,17 @@ def export(
     current_dir = current_file.parent
 
     if package is None:
-        package = __name__
-        for frame in reversed(outer_frames):
-            if "__file__" in frame.frame.f_globals:
-                call_dir = Path(frame.frame.f_globals["__file__"]).resolve().parent
-                if current_dir.as_posix().startswith(call_dir.as_posix()):
-                    package = frame.frame.f_globals["__package__"]
-                    subpackage = (
-                        current_dir.relative_to(call_dir).as_posix().replace("/", ".")
-                    )
-                    package = f"{package}.{subpackage}" if package else subpackage
-                    break
+        package = _locals["__name__"]
+        # for frame in reversed(outer_frames):
+        #     if "__file__" in frame.frame.f_globals:
+        #         call_dir = Path(frame.frame.f_globals["__file__"]).resolve().parent
+        #         if current_dir.as_posix().startswith(call_dir.as_posix()):
+        #             package = frame.frame.f_globals["__package__"]
+        #             subpackage = (
+        #                 current_dir.relative_to(call_dir).as_posix().replace("/", ".")
+        #             )
+        #             package = f"{package}.{subpackage}" if package else subpackage
+        #             break
 
     cached = _get_cache()
     unique_key = (current_file.as_posix(), call_frame.frame.f_lineno)
