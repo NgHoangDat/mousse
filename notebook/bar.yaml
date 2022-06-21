@@ -1,0 +1,5 @@
+foo:
+  name: foo
+  number: 42.0
+  items: [banana, egg]
+id: 1
