@@ -6,5 +6,5 @@ build
 logs
 __pycache__
 *.egg-info
-# notebook
+notebook/.ipynb_checkpoints
 tests

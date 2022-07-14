@@ -238,7 +238,6 @@ def asclass(
         path_obj = load(path)
 
     env_obj = {}
-    print(env)
     if env:
         for key, val in os.environ.items():
             if key.startswith(env + "_"):
@@ -247,7 +246,6 @@ def asclass(
                     key = alias[key]
                     env_obj[key] = val
 
-    print(env_obj)
     data = {**env_obj, **path_obj, **local_obj}
     data = {
         alias.get(key, key): val
@@ -255,9 +253,6 @@ def asclass(
         if alias.get(key, key) in fields
     }
 
-    data = {
-        key: parser(val, fields[key])
-        for key, val in data.items()
-    }
+    data = {key: parser(val, fields[key]) for key, val in data.items()}
 
     return cls(**data)

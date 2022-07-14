@@ -12,7 +12,7 @@ def read_requirements(path: Union[str, Path]):
         return [line.strip() for line in fh.readlines() if not line.startswith("#")]
 
 
-__VERSION__ = "0.1.12"
+__VERSION__ = "0.1.13"
 
 requirements = read_requirements("requirements.txt")
 

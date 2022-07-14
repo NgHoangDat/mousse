@@ -2,7 +2,6 @@ from copy import deepcopy
 from typing import *
 
 from .field import Field
-from .validator import validate
 
 
 class Accessor:
@@ -25,6 +24,8 @@ class Accessor:
         return self.storage.get(obj)
 
     def __set__(self, obj: Any, val: Any):
+        from .validator import validate
+
         if self.strict:
             assert validate(
                 self.field.annotation, val

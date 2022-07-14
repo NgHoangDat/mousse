@@ -4,9 +4,14 @@ from typing import *
 
 from .accessor import Accessor
 from .field import Field, get_fields_info
-from .validator import Validator
 
-__all__ = ["Dataclass", "DataMetaclass"]
+__all__ = ["Dataclass", "DataMetaclass", "Validator"]
+
+
+class Validator:
+    def __init__(self, field: str, func: Callable):
+        self.field = field
+        self.func = func
 
 
 class DataMetaclass(type):
@@ -66,8 +71,14 @@ class DataMetaclass(type):
                 defaults.append(default_val)
 
         def __init__(self, *args, **kwargs):
+            fields = get_fields_info(self.__class__)
             for key, val in kwargs.items():
-                if key in get_fields_info(self.__class__):
+                if key in fields:
+                    field: Field = fields[key]
+                    if field.validator is not None:
+                        assert field.validator(
+                            val
+                        ), f"[{self.__class__.__name__}] Invalid data for {key}: {val}"
                     setattr(self, key, val)
 
             if hasattr(self, "__build__"):
