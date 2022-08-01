@@ -370,3 +370,66 @@ Note:
 - `hour` has value from 0 - 23
 - `minute` and `second` hav value from 0 - 59
 - If no suitable time found, the function won't be called
+
+### Pattern
+
+---
+> A collection of my most used design patterns
+
+#### Registry pattern
+
+```py
+# registry.py
+from mousse import Registry
+
+pokedex = Registry()
+
+
+class Pokemon:
+    def __init__(self, name:str):
+        self.name = name
+```
+
+```py
+# kanto.py
+from .registry import pokedex, Pokemon
+
+
+@pokedex.register
+class Pikachu(Pokemon):
+    def sound(self):
+        return "pika pika chu"
+
+
+
+@pokedex.register
+class Charmander(Pokemon):
+    def sound(self):
+        return "charman charman der"
+```
+
+```py
+# johto.py
+from .registry import pokedex, Pokemon
+
+
+@pokedex.register
+class Chikorita(Pokemon):
+    def sound(self):
+        return "chiko chiko"
+```
+
+```py
+from . import kanto, johto
+from .registry import pokedex
+
+
+pikachu = pokedex("Pikachu", "1st")
+print(pikachu.name, pikachu.sound())
+
+charmander = pokedex("Charmander", "2nd")
+print(charmander.name, charmander.sound())
+
+chikorita = pokedex("Chikorita", "3rd")
+print(chikorita.name, chikorita.sound())
+```
