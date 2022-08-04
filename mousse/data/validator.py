@@ -1,11 +1,15 @@
 import inspect
 from typing import *
+from functools import lru_cache
+from collections import OrderedDict
+from inspect import Parameter
+from functools import wraps
 
 from .field import Field, get_fields_info
 from .dataclass import Dataclass, Validator
 from .types import Generic, get_args, get_origin
 
-__all__ = ["validator", "Validator", "validate"]
+__all__ = ["validator", "Validator", "validate", "type_checking"]
 
 
 validators = {}
@@ -152,6 +156,7 @@ def validate_dataclass(
     G: Dataclass, obj: Any, as_schema: bool = False, strict: bool = False, **kwargs
 ):
     from .parser import asclass
+
     if not as_schema:
         return isinstance(obj, G)
 
@@ -175,14 +180,14 @@ def validate_dataclass(
             field.annotation, val, as_schema=as_schema, strict=strict, **kwargs
         ):
             return False
-        
+
         if field.validator is not None:
             if issubclass(field.annotation, Dataclass):
                 try:
                     val = asclass(field.annotation, val)
                 except AssertionError:
                     return False
-                
+
                 if not field.validator(val):
                     return False
 
@@ -196,6 +201,140 @@ def validate_dataclass(
 def validator(field: str, func: Callable = None):
     def decorator(func: Callable):
         return Validator(field, func)
+
+    if func is not None:
+        return decorator(func)
+
+    return decorator
+
+
+@lru_cache
+def get_func_validator(func: Callable):
+    signature = inspect.signature(func)
+    parameters = signature.parameters
+    parameters = OrderedDict(parameters.items())
+
+    has_var_args = False
+    for param in parameters.values():
+        if param.kind == param.VAR_POSITIONAL:
+            has_var_args = True
+            break
+
+    if has_var_args:
+        parameters.pop(param.name)
+
+    has_var_kwargs = False
+    for param in parameters.values():
+        if param.kind == param.VAR_KEYWORD:
+            has_var_kwargs = True
+            break
+
+    if has_var_kwargs:
+        parameters.pop(param.name)
+
+    positional_only_params = [
+        param for param in parameters.values() if param.kind == param.POSITIONAL_ONLY
+    ]
+
+    positional_or_keyword_params = [
+        param
+        for param in parameters.values()
+        if param.kind == param.POSITIONAL_OR_KEYWORD
+    ]
+
+    def validator(*args, **kwargs) -> Union[bool, str]:
+        l_parameters = parameters.copy()
+
+        if len(positional_only_params) > len(args):
+            return False, "Missing positional only params"
+
+        for arg, param in zip(args, positional_only_params):
+            l_parameters.pop(param.name)
+
+            if param.annotation in (inspect._empty, Any):
+                continue
+
+            if not validate(param.annotation, arg):
+                return (
+                    False,
+                    f"Wrong type for {param.name}. Expect type {param.annotation.__name__}",
+                )
+
+        args = args[len(positional_only_params) :]
+
+        if len(args) > len(positional_or_keyword_params):
+            if not has_var_args:
+                return False, "Too many arguments"
+
+        for arg, param in zip(args, positional_or_keyword_params):
+            l_parameters.pop(param.name)
+            if param.annotation in (inspect._empty, Any):
+                continue
+
+            if param.default != param.empty and arg == param.default:
+                continue
+
+            if not validate(param.annotation, arg):
+                return (
+                    False,
+                    f"Wrong type for {param.name}. Expect type {param.annotation.__name__}",
+                )
+
+        for key in kwargs:
+            if key not in l_parameters:
+                if not has_var_kwargs:
+                    return False, f"Unknown keyword argument: {key}"
+
+        for key, val in kwargs.items():
+            if key in l_parameters:
+                param = l_parameters.pop(key)
+                if param.annotation in (inspect._empty, Any):
+                    continue
+
+                if param.default != param.empty and val == param.default:
+                    continue
+
+                if not validate(param.annotation, val):
+                    return (
+                        False,
+                        f"Wrong type for {param.name}. Expect type {param.annotation.__name__}",
+                    )
+
+        for param in l_parameters.values():
+            if param.default == inspect._empty:
+                return False, f"Missing value for {param.name}"
+
+        return True, ""
+
+    return validator
+
+
+def validate_parameters(func: Callable, /, *args, **kwargs) -> Union[bool, str]:
+    validator = get_func_validator(func)
+    return validator(*args, **kwargs)
+
+
+def type_checking(
+    func: Callable = None, param_annotation: bool = True, return_annotation: bool = True
+):
+    def decorator(func: Callable):
+        signature = inspect.signature(func)
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if param_annotation:
+                valid, err = validate_parameters(func, *args, **kwargs)
+                assert valid, err
+
+            output = func(*args, **kwargs)
+            if return_annotation and signature.return_annotation is not inspect._empty:
+                assert validate(
+                    signature.return_annotation, output
+                ), f"Incorrect return type: {type(output)}. Correct return type: {signature.return_annotation}"
+
+            return output
+
+        return wrapper
 
     if func is not None:
         return decorator(func)

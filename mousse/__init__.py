@@ -11,6 +11,7 @@ from .data import (
     parser,
     validate,
     validator,
+    type_checking,
 )
 from .export import export, export_instance, export_subclass
 from .logger import add_handler, get_logger, init_logger, log_error, log_time
@@ -66,4 +67,5 @@ __all__ = [
     "watch_async",
     "Schedulable",
     "schedulable",
+    "type_checking",
 ]
