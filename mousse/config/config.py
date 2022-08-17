@@ -58,6 +58,9 @@ class ConfigDetailContainer:
         self.detail = ConfigDetail()
         self.freeze = freeze
 
+    def __len__(self):
+        return len(self.detail)
+
 
 class ConfigDetailAccessor:
     def __init__(self, val: Any):
@@ -254,7 +257,7 @@ def get_config(*args, **kwargs):
 
 
 @lru_cache(typed=True)
-def load_config(*args, path: Union[str, Path, NoneType] = None, **kwargs):
+def __load_config(*args, path: Union[str, Path, NoneType] = None, **kwargs):
     params = {}
 
     if path:
@@ -272,3 +275,7 @@ def load_config(*args, path: Union[str, Path, NoneType] = None, **kwargs):
     update(config, **params)
 
     return config
+
+
+def load_config(*args, path: Union[str, Path, NoneType] = None, **kwargs):
+    return __load_config(*args, path=path, **kwargs)

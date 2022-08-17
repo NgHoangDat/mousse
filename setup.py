@@ -6,13 +6,13 @@ import setuptools
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-    
+
 def read_requirements(path: Union[str, Path]):
     with open(path, "r") as fh:
         return [line.strip() for line in fh.readlines() if not line.startswith("#")]
 
 
-__VERSION__ = "0.1.14"
+__VERSION__ = "0.1.15"
 
 requirements = read_requirements("requirements.txt")
 
@@ -37,7 +37,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.6',
+    python_requires=">=3.6",
     install_requires=requirements,
     extras_require=extras_require,
 )
