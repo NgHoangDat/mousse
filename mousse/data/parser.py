@@ -8,7 +8,7 @@ import yaml
 
 from .dataclass import Dataclass
 from .field import Field, get_fields_info
-from .types import Generic, get_args, get_origin
+from .types import Generic, get_args, get_origin, is_generic
 from .validator import validate
 
 __all__ = ["Parser", "asdict", "asclass", "parse", "parser"]
@@ -41,7 +41,7 @@ def parser(*types: Type[Generic], func: Callable = None):
 
 
 def parse(G: Union[Generic, Type], obj: Any, **kwargs):
-    if isinstance(G, get_args(Generic)):
+    if is_generic(G):
         origin = get_origin(G)
         if origin in parsers:
             parser = parsers[origin]

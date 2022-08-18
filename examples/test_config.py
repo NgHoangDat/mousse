@@ -11,7 +11,7 @@ class Item(Dataclass):
 class Foo(Dataclass):
     name: str
     number: float
-    items: List[Item]
+    items: Set[Item]
 
 
 class Bar(Dataclass):

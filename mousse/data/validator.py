@@ -208,7 +208,7 @@ def validator(field: str, func: Callable = None):
     return decorator
 
 
-@lru_cache
+@lru_cache(maxsize=None)
 def get_func_validator(func: Callable):
     signature = inspect.signature(func)
     parameters = signature.parameters
@@ -309,7 +309,7 @@ def get_func_validator(func: Callable):
     return validator
 
 
-def validate_parameters(func: Callable, /, *args, **kwargs) -> Union[bool, str]:
+def validate_parameters(func: Callable, *args, **kwargs) -> Union[bool, str]:
     validator = get_func_validator(func)
     return validator(*args, **kwargs)
 
