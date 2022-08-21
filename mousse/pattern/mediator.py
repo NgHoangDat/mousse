@@ -2,7 +2,7 @@ from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from typing import *
 
-from ..data import Accessor, DataMetaclass
+from ..types import Accessor, DataMetaclass
 
 
 __all__ = ["Listener", "Mediator"]

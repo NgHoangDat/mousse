@@ -12,14 +12,14 @@ class Field:
         alias: str = None,
         freeze: bool = False,
         exclude: bool = None,
-        validator: Callable = None,
+        # validator: Callable = None,
     ) -> None:
         self.default = default
         self.alias = alias
         self.freeze = freeze
         self.annotation = None
         self.exclude = exclude
-        self.validator = validator
+        # self.validator = validator
 
 
 def get_fields_info(cls: Any) -> Dict[str, Field]:

@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 import time
-from copy import deepcopy
 from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -10,10 +9,11 @@ from threading import Thread
 from typing import *
 from typing import Callable
 
+from dialga import call_after
 from yaml import Loader, load
 
-from ..data import parse, parser
-from ..scheduler import call_after
+from .dataclass import Dataclass
+from .parser import asclass, parse, parser
 
 NoneType = type(None)
 
@@ -67,7 +67,7 @@ class ConfigDetailAccessor:
         self.val = val
 
     def __get__(self, obj: Any, *args, **kwargs):
-        return deepcopy(self.val)
+        return self.val
 
     def __set__(self, obj: Any, val: Any):
         container = get_container(obj)
@@ -252,12 +252,16 @@ def parse_config(G: Type[Config], config: Config):
 
 
 @lru_cache(typed=True)
-def get_config(*args, **kwargs):
+def __get_config(key: str, **kwargs):
     return Config()
 
 
+def get_config(key: str, **kwargs):
+    return __get_config(key, **kwargs)
+
+
 @lru_cache(typed=True)
-def __load_config(*args, path: Union[str, Path, NoneType] = None, **kwargs):
+def __load_config(key: str, path: Union[str, Path, NoneType] = None, **kwargs):
     params = {}
 
     if path:
@@ -271,11 +275,19 @@ def __load_config(*args, path: Union[str, Path, NoneType] = None, **kwargs):
 
             params = loader(f)
 
-    config = get_config(*args, **kwargs)
+    config = get_config(key, **kwargs)
     update(config, **params)
 
     return config
 
 
-def load_config(*args, path: Union[str, Path, NoneType] = None, **kwargs):
-    return __load_config(*args, path=path, **kwargs)
+def load_config(
+    key: str,
+    path: Union[str, Path, NoneType] = None,
+    schema: Dataclass = None,
+    **kwargs,
+):
+    config = __load_config(key, path=path, **kwargs)
+    if schema is not None:
+        config = asclass(schema, config)
+    return config

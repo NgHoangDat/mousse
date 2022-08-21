@@ -5,13 +5,7 @@ from typing import *
 from .accessor import Accessor
 from .field import Field, get_fields_info
 
-__all__ = ["Dataclass", "DataMetaclass", "Validator"]
-
-
-class Validator:
-    def __init__(self, field: str, func: Callable):
-        self.field = field
-        self.func = func
+__all__ = ["Dataclass", "DataMetaclass"]
 
 
 class DataMetaclass(type):
@@ -23,15 +17,6 @@ class DataMetaclass(type):
         accessor: Type[Accessor] = Accessor,
         strict: bool = False,
     ):
-        validators = {}
-        for key, val in data.items():
-            if isinstance(val, Validator):
-                if val.field not in validators:
-                    validators[val.field] = []
-
-                validators[val.field].append(key)
-                data[key] = val.func
-
         keys = []
         parameters = [Parameter("self", Parameter.POSITIONAL_ONLY)]
         defaults = []
@@ -56,9 +41,7 @@ class DataMetaclass(type):
 
                 fields[key] = field
 
-                data[key] = accessor(
-                    key, field=field, validators=validators.get(key), strict=strict
-                )
+                data[key] = accessor(key, field=field, strict=strict)
                 keys.append(key)
                 parameters.append(
                     Parameter(
@@ -74,11 +57,6 @@ class DataMetaclass(type):
             fields = get_fields_info(self.__class__)
             for key, val in kwargs.items():
                 if key in fields:
-                    field: Field = fields[key]
-                    if field.validator is not None:
-                        assert field.validator(
-                            val
-                        ), f"[{self.__class__.__name__}] Invalid data for {key}: {val}"
                     setattr(self, key, val)
 
             if hasattr(self, "__build__"):

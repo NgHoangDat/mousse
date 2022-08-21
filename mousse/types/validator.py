@@ -2,14 +2,15 @@ import inspect
 from typing import *
 from functools import lru_cache
 from collections import OrderedDict
-from inspect import Parameter
+
+# from inspect import Parameter
 from functools import wraps
 
 from .field import Field, get_fields_info
-from .dataclass import Dataclass, Validator
+from .dataclass import Dataclass
 from .types import Generic, get_args, get_origin
 
-__all__ = ["validator", "Validator", "validate", "type_checking"]
+__all__ = ["validate", "type_checking"]
 
 
 validators = {}
@@ -198,14 +199,14 @@ def validate_dataclass(
     return True
 
 
-def validator(field: str, func: Callable = None):
-    def decorator(func: Callable):
-        return Validator(field, func)
+# def validator(field: str, func: Callable = None):
+#     def decorator(func: Callable):
+#         return Validator(field, func)
 
-    if func is not None:
-        return decorator(func)
+#     if func is not None:
+#         return decorator(func)
 
-    return decorator
+#     return decorator
 
 
 @lru_cache(maxsize=None)
