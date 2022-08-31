@@ -29,3 +29,4 @@ assert validate(Foo, foo)  # True
 assert validate(List[Foo], [foo])  # True
 assert not validate(List[Foo], (foo,))  # False
 assert validate(Sequence[Foo], (foo,))  # True
+assert validate(Foo, {"name": "foo", "number": 42.0}, as_schema=True)

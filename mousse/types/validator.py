@@ -182,14 +182,20 @@ def validate_dataclass(
         ):
             return False
 
-        if field.validator is not None:
+        if field.validators:
             if issubclass(field.annotation, Dataclass):
                 try:
                     val = asclass(field.annotation, val)
                 except AssertionError:
                     return False
 
-                if not field.validator(val):
+            for validator in field.validators.values():
+                if validator.static:
+                    valid = validator(val)
+                else:
+                    valid = validator(obj, val)
+
+                if not valid:
                     return False
 
     for key, field in fields.items():

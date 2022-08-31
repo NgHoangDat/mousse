@@ -25,7 +25,7 @@ class DataMetaclass(type):
         if "__annotations__" in data:
             annotations = data.pop("__annotations__")
             for key, dtype in annotations.items():
-                default_val = None
+                default_val = Ellipsis
                 if key in data:
                     default_val = data.pop(key)
 
@@ -33,7 +33,7 @@ class DataMetaclass(type):
                     field = default_val
                     default_val = field.default
                 else:
-                    field = Field(default_val or Ellipsis)
+                    field = Field(default_val)
 
                 field.annotation = dtype
                 if field.exclude is None:

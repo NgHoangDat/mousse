@@ -15,22 +15,25 @@ else:
 
 if sys.version_info > (3, 8):
     from typing import get_args, get_origin
-    
+
     def is_generic(generic: Generic):
         return isinstance(generic, get_args(Generic))
-    
+
 else:
     from typing import List, Set, Sequence, Tuple
-    
+
     generic_mappings = {
-        List: list, Set: set, Sequence: List, Tuple: tuple,
+        List: list,
+        Set: set,
+        Sequence: List,
+        Tuple: tuple,
     }
 
     def is_generic(generic: Generic):
         origin = getattr(generic, "__origin__", None)
         if origin is Union:
             return True
-        
+
         return isinstance(generic, get_args(Generic))
 
     def get_args(generic: Generic):
@@ -42,7 +45,7 @@ else:
             return generic_mappings[origin]
 
         if origin is None and is_generic(generic) and hasattr(generic, "mro"):
-            for parent in generic.mro()[1:]:                
+            for parent in generic.mro()[1:]:
                 return parent
-            
+
         return origin
