@@ -2,7 +2,11 @@ import sys
 
 __all__ = ["Generic", "get_args", "get_origin", "is_generic"]
 
-if sys.version_info > (3, 7):
+if sys.version_info > (3, 8):
+    from typing import _SpecialGenericAlias, _GenericAlias, _SpecialForm, Union
+
+    Generic = Union[_GenericAlias, _SpecialGenericAlias, _SpecialForm]
+elif sys.version_info > (3, 7):
     from typing import _GenericAlias, _SpecialForm, Union
 
     Generic = Union[_GenericAlias, _SpecialForm]

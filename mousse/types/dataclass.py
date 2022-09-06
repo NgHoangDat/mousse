@@ -36,12 +36,14 @@ class DataMetaclass(type):
                     field = Field(default_val)
 
                 field.annotation = dtype
-                if field.exclude is None:
-                    field.exclude = key.startswith("_")
+                if field.private is None:
+                    field.private = key.startswith("_")
 
                 fields[key] = field
+                if field.strict is None:
+                    field.strict = strict
 
-                data[key] = accessor(key, field=field, strict=strict)
+                data[key] = accessor(key, field=field)
                 keys.append(key)
                 parameters.append(
                     Parameter(

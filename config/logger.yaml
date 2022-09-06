@@ -1,0 +1,11 @@
+level: 20
+include_extra: true
+handlers:
+  - type: RotatingFileHandler
+    level: 40
+    params:
+      path: logs/test.err
+      backup_count: 2
+    formatter:
+      fmt: "[{asctime}] [{process} {thread}] [{levelname}] Alert: {message}"
+      style: "{"

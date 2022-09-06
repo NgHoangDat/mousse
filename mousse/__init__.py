@@ -1,5 +1,5 @@
 from .export import export, export_instance, export_subclass
-from .logger import add_handler, get_logger, init_logger, log_error, log_time
+from .logger import get_logger, log_error, log_time, Handler, handler_registry
 from .pattern import (
     AutoRegistry,
     Listener,
@@ -17,7 +17,6 @@ from .types import (
     Dataclass,
     Field,
     Parser,
-    # Validator,
     asclass,
     asdict,
     get_config,
@@ -37,21 +36,21 @@ __all__ = [
     "Config",
     "Dataclass",
     "Field",
+    "Handler",
     "Listener",
     "Mediator",
     "ObjectPool",
     "Parser",
     "Registry",
     "Singleton",
-    "add_handler",
     "asclass",
     "asdict",
     "export",
     "export_instance",
     "export_subclass",
     "get_config",
-    "init_logger",
     "get_logger",
+    "handler_registry",
     "load_config",
     "log_error",
     "log_time",

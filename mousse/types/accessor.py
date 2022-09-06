@@ -9,11 +9,9 @@ class Accessor:
         self,
         key: str,
         field: Field = None,
-        strict: bool = False,
     ):
         self.key = key
         self.field = field
-        self.strict = strict
         self.storage = {}
 
     def __get__(self, obj: Any, *args, **kwargs):
@@ -21,7 +19,10 @@ class Accessor:
             return self
 
         if obj not in self.storage:
-            self.storage[obj] = deepcopy(self.field.default)
+            if self.field.factory is not None:
+                self.storage[obj] = self.field.factory()
+            else:
+                self.storage[obj] = deepcopy(self.field.default)
         val = self.storage.get(obj)
 
         for getter in self.field.getters.values():
@@ -41,7 +42,7 @@ class Accessor:
             else:
                 val = setter(obj, val)
 
-        if self.strict:
+        if self.field.strict:
             assert validate(
                 self.field.annotation, val
             ), f"Invalid datatype: require {self.field.annotation}, get {type(val)}"

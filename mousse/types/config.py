@@ -252,16 +252,16 @@ def parse_config(G: Type[Config], config: Config):
 
 
 @lru_cache(typed=True)
-def __get_config(key: str, **kwargs):
+def __get_config(key: str):
     return Config()
 
 
-def get_config(key: str, **kwargs):
-    return __get_config(key, **kwargs)
+def get_config(key: str):
+    return __get_config(key)
 
 
 @lru_cache(typed=True)
-def __load_config(key: str, path: Union[str, Path, NoneType] = None, **kwargs):
+def __load_config(key: str, path: Union[str, Path, NoneType] = None):
     params = {}
 
     if path:
@@ -275,19 +275,22 @@ def __load_config(key: str, path: Union[str, Path, NoneType] = None, **kwargs):
 
             params = loader(f)
 
-    config = get_config(key, **kwargs)
-    update(config, **params)
+    if key is not None:
+        config = get_config(key)
+    else:
+        config = Config()
 
+    update(config, **params)
     return config
 
 
 def load_config(
-    key: str,
+    key: str = "default",
     path: Union[str, Path, NoneType] = None,
     schema: Dataclass = None,
     **kwargs,
 ):
-    config = __load_config(key, path=path, **kwargs)
+    config = __load_config(key, path=path)
     if schema is not None:
         config = asclass(schema, config)
     return config

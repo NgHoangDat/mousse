@@ -243,12 +243,12 @@ print(bar)
 ```py
 # entry_point.py
 
-from mousse import init_logger
+from mousse import get_logger
 
-init_logger(
+logger = get_logger(
     "foo", # key to identify logger,
-    log_dir="logs" # log directory
 )
+logger.add_handler("RotatingFileHandler", path="logs/foo.out")
 ```
 
 ```py
@@ -258,16 +258,14 @@ from mousse import get_logger
 
 logger = get_logger("foo")
 logger.info("This is", "my", "logger number:", 1)
-# [2022-05-09 20:28:04] [43050 4345906560] [INFO] [2678317510.py.<cell line: 1>:1] This is my logger number: 1
+# [2022-05-09 20:28:04] [43050 4345906560] [INFO] [anywhere:.<module>:1] This is my logger number: 1
 ```
 
 The format of the log is:
 
 ```txt
-[{date} {time}] [{process_id} {thread_id}] [{level}] [{file}.{caller}.{lineno}] {msg}
+[{date} {time}] [{process_id} {thread_id}] [{level}] [{file}:{caller}:{lineno}] {msg}
 ```
-
-After `init_logger`, log with also be saved to the log directory
 
 ### Pattern
 

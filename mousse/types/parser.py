@@ -119,7 +119,7 @@ def parse_tuple(G: Generic, obj: Any, **kwargs):
 
 @parser(Dict)
 def parse_dict(G: Generic, obj: Any, **kwargs):
-    assert issubclass(type(obj), dict), f"Unable to parse from {type(obj)} to {G}"
+    assert issubclass(type(obj), Mapping), f"Unable to parse from {type(obj)} to {G}"
     key_type, val_type = get_args(G)
     return {
         parse(key_type, key, **kwargs): parse(val_type, val, **kwargs)
@@ -195,15 +195,15 @@ def asdict(obj: Dataclass, by_alias: bool = True, parser: Parser = DictParser())
     fields: Dict[str, Field] = get_fields_info(type(obj))
     dictionary: Dict[str, Any] = {}
     for key, field in fields.items():
-        if field.exclude:
+        if field.private:
             continue
 
         val = getattr(obj, key)
         if isinstance(val, Dataclass):
             val = asdict(val, by_alias=by_alias, parser=parser)
-        elif isinstance(obj, (list, set, tuple)):
+        elif isinstance(val, (list, set, tuple)):
             val = type(val)(asdict(elem) for elem in val)
-        elif isinstance(obj, dict):
+        elif isinstance(val, dict):
             val = {_key: asdict(_val) for _key, _val in val.items()}
         else:
             pass

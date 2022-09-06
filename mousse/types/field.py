@@ -1,3 +1,4 @@
+from ast import Call
 from collections import OrderedDict
 from functools import lru_cache
 from typing import *
@@ -19,13 +20,17 @@ class Field:
         default: Any = Ellipsis,
         alias: str = None,
         freeze: bool = False,
-        exclude: bool = None,
+        private: bool = None,
+        strict: bool = None,
+        factory: Callable = None,
     ) -> None:
         self.default = default
         self.alias = alias
         self.freeze = freeze
         self.annotation = None
-        self.exclude = exclude
+        self.private = private
+        self.strict = strict
+        self.factory = factory
 
         self.validators = OrderedDict()
         self.setters = OrderedDict()
