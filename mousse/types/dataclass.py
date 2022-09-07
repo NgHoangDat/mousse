@@ -16,8 +16,8 @@ class DataMetaclass(type):
         data: Dict[str, Any],
         accessor: Type[Accessor] = Accessor,
         strict: bool = False,
+        dynamic: bool = False,
     ):
-        keys = []
         parameters = [Parameter("self", Parameter.POSITIONAL_ONLY)]
         defaults = []
         fields = {}
@@ -44,7 +44,6 @@ class DataMetaclass(type):
                     field.strict = strict
 
                 data[key] = accessor(key, field=field)
-                keys.append(key)
                 parameters.append(
                     Parameter(
                         key,
@@ -56,9 +55,21 @@ class DataMetaclass(type):
                 defaults.append(default_val)
 
         def __init__(self, *args, **kwargs):
-            fields = get_fields_info(self.__class__)
+            fields = get_fields_info(self.__class__, self)
             for key, val in kwargs.items():
                 if key in fields:
+                    setattr(self, key, val)
+                    continue
+
+                if dynamic and not key.startswith("_"):
+                    dtype = type(val)
+                    field = Field(factory=dtype)
+                    field.annotation = dtype
+                    field.private = key.startswith("_")
+                    field.strict = strict
+                    fields[key] = field
+
+                    setattr(self, key, accessor(key, field=field))
                     setattr(self, key, val)
 
             if hasattr(self, "__build__"):
@@ -70,7 +81,10 @@ class DataMetaclass(type):
             result = cls.__new__(cls)
             result.__dict__.update(self.__dict__)
 
-            for key in get_fields_info(cls):
+            fields = get_fields_info(cls, result)
+            fields.update(get_fields_info(cls, self))
+
+            for key in fields:
                 val = getattr(self, key)
                 setattr(result, key, copy(val))
 
@@ -84,7 +98,10 @@ class DataMetaclass(type):
             for k, v in self.__dict__.items():
                 setattr(result, k, deepcopy(v, memo))
 
-            for key in get_fields_info(cls):
+            fields = get_fields_info(cls, result)
+            fields.update(get_fields_info(cls, self))
+
+            for key in fields:
                 val = getattr(self, key)
                 setattr(result, key, deepcopy(val))
 
@@ -99,17 +116,17 @@ class DataMetaclass(type):
             from .parser import asclass
 
             new = asclass(self.__class__, state)
-            for key in get_fields_info(self.__class__):
+            for key in get_fields_info(self.__class__, self):
                 val = getattr(new, key)
                 setattr(self, key, val)
 
         def __iter__(self):
-            for key in get_fields_info(self.__class__):
+            for key in get_fields_info(self.__class__, self):
                 yield key, getattr(self, key)
 
         def __repr__(self):
             components = []
-            for key in get_fields_info(self.__class__):
+            for key in get_fields_info(self.__class__, self):
                 val = getattr(self, key)
                 if isinstance(val, str):
                     components.append(f'{key}="{val}"')

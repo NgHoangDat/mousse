@@ -18,7 +18,20 @@ def load_yaml(stream: Any) -> Dict[str, Any]:
     return yaml.load(stream, Loader=yaml.Loader) or {}
 
 
+def dump_yaml(data: Any, stream: Any):
+    return yaml.dump(
+        data,
+        stream,
+        Dumper=yaml.Dumper,
+        default_flow_style=False,
+        indent=2,
+        allow_unicode=True,
+    )
+
+
 LOADER = {".json": json.load, ".yaml": load_yaml, ".yml": load_yaml}
+
+DUMPER = {".json": json.dump, ".yaml": dump_yaml, ".yml": dump_yaml}
 
 
 parsers = {}
@@ -120,11 +133,14 @@ def parse_tuple(G: Generic, obj: Any, **kwargs):
 @parser(Dict)
 def parse_dict(G: Generic, obj: Any, **kwargs):
     assert issubclass(type(obj), Mapping), f"Unable to parse from {type(obj)} to {G}"
-    key_type, val_type = get_args(G)
-    return {
-        parse(key_type, key, **kwargs): parse(val_type, val, **kwargs)
-        for key, val in obj.items()
-    }
+    if is_generic(G):
+        key_type, val_type = get_args(G)
+        return {
+            parse(key_type, key, **kwargs): parse(val_type, val, **kwargs)
+            for key, val in obj.items()
+        }
+
+    return {key: asdict(val, **kwargs) for key, val in obj.items()}
 
 
 @parser(Union)
@@ -164,7 +180,7 @@ class DictParser(Parser):
             if getattr(field.annotation, "_name", None) == "Dict":
                 return parse(field.annotation, val, **kwargs)
 
-            return parse(get_origin(field.annotation), val, **kwargs)
+            return parse(field.annotation, val, **kwargs)
 
         return val
 
@@ -178,41 +194,67 @@ def load(path: Union[str, Path]) -> Dict[str, Any]:
     if type(path) is not Path:
         path = Path(path).resolve()
 
-    with open(path, encoding="utf-8") as f:
-        loader = LOADER.get(path.suffix)
+    with open(path, encoding="utf-8") as fin:
+        loader = LOADER.get(path.suffix.lower())
         if loader is None:
             raise Exception(f"file format {path.suffix} is not supported")
 
-        params = loader(f)
+        params = loader(fin)
 
     return params
 
 
-def asdict(obj: Dataclass, by_alias: bool = True, parser: Parser = DictParser()):
+def dump(data: Any, path: Union[str, Path]):
+    if type(path) is not Path:
+        path = Path(path)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fout:
+        dumper = DUMPER.get(path.suffix.lower())
+        if dumper is None:
+            raise Exception(f"file format {path.suffix} is not supported")
+
+        dumper(data, fout)
+
+
+def asdict(
+    obj: Dataclass,
+    by_alias: bool = True,
+    path: Path = None,
+    parser: Parser = DictParser(),
+):
     if not isinstance(obj, Dataclass):
         return parse(type(obj), obj)
 
-    fields: Dict[str, Field] = get_fields_info(type(obj))
+    fields: Dict[str, Field] = get_fields_info(type(obj), obj)
     dictionary: Dict[str, Any] = {}
     for key, field in fields.items():
         if field.private:
             continue
 
         val = getattr(obj, key)
+        val = parser(val, field, by_alias=by_alias)
+
         if isinstance(val, Dataclass):
             val = asdict(val, by_alias=by_alias, parser=parser)
         elif isinstance(val, (list, set, tuple)):
-            val = type(val)(asdict(elem) for elem in val)
+            val = type(val)(
+                asdict(elem, by_alias=by_alias, parser=parser) for elem in val
+            )
         elif isinstance(val, dict):
-            val = {_key: asdict(_val) for _key, _val in val.items()}
+            val = {
+                _key: asdict(_val, by_alias=True, parser=parser)
+                for _key, _val in val.items()
+            }
         else:
             pass
-
-        val = parser(val, field)
 
         key = field.alias if by_alias and field.alias is not None else key
         if val != Ellipsis:
             dictionary[key] = val
+
+    if path is not None:
+        dump(dictionary, path=path)
 
     return dictionary
 
@@ -247,12 +289,19 @@ def asclass(
                     env_obj[key] = val
 
     data = {**env_obj, **path_obj, **local_obj}
-    data = {
-        alias.get(key, key): val
-        for key, val in data.items()
-        if alias.get(key, key) in fields
-    }
 
-    data = {key: parser(val, fields[key]) for key, val in data.items()}
+    schema_data = {}
+    custom_data = {}
+    for key, val in data.items():
+        if key in alias:
+            key = alias[key]
 
-    return cls(**data)
+        if key in fields:
+            schema_data[key] = parser(val, fields[key])
+            continue
+
+        custom_data[key] = val
+
+    data = {**custom_data, **schema_data}
+    ins = cls(**data)
+    return ins

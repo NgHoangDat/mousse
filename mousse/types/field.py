@@ -1,4 +1,3 @@
-from ast import Call
 from collections import OrderedDict
 from functools import lru_cache
 from typing import *
@@ -67,10 +66,21 @@ class Field:
         return decorator
 
 
-def get_fields_info(cls: Any) -> Dict[str, Field]:
-    return _get_fields_info(cls)
+def get_fields_info(cls: Any, ins: Any = None) -> Dict[str, Field]:
+    defaults = _get_fields_info(cls)
+    if ins is not None:
+        custom = _get_custome_info(ins)
+        custom.update(defaults)
+        return custom
+
+    return defaults
 
 
 @lru_cache(typed=True)
 def _get_fields_info(cls: Any) -> Dict[str, Field]:
+    return {}
+
+
+@lru_cache(typed=True)
+def _get_custome_info(ins: Any) -> Dict[str, Field]:
     return {}

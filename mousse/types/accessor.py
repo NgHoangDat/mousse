@@ -1,7 +1,7 @@
 from copy import deepcopy
 from typing import *
 
-from .field import Field
+from .field import Field, get_fields_info
 
 
 class Accessor:
@@ -35,6 +35,9 @@ class Accessor:
 
     def __set__(self, obj: Any, val: Any):
         from .validator import validate
+        from .parser import parse
+
+        val = parse(self.field.annotation, val)
 
         for setter in self.field.setters.values():
             if setter.static:

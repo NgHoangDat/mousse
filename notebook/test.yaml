@@ -1,0 +1,12 @@
+_:
+  - &age 18
+  - &name datnh21
+  - &obj
+      count: 1
+
+age: 18
+name:
+  a: *age
+  name: *name
+  obj: *obj
+custom: 1
