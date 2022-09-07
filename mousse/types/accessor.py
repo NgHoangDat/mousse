@@ -1,7 +1,7 @@
 from copy import deepcopy
 from typing import *
 
-from .field import Field, get_fields_info
+from .field import Field
 
 
 class Accessor:

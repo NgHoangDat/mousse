@@ -27,7 +27,7 @@ def load_yaml(stream: Any) -> Dict[str, Any]:
 LOADER = {".json": json.load, ".yaml": load_yaml, ".yml": load_yaml}
 
 
-class ConfigDetail(Mapping):
+class ConfigDetail:
     def __iter__(self):
         for _ in range(0):
             yield _
@@ -80,7 +80,7 @@ def get_container(ins: Any):
     return ConfigDetailContainer()
 
 
-class Config(Mapping):
+class Config:
     def __getattribute__(self, key: str):
         container = get_container(self)
         if hasattr(container.detail, key):

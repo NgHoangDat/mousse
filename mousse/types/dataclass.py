@@ -63,14 +63,16 @@ class DataMetaclass(type):
 
                 if dynamic and not key.startswith("_"):
                     dtype = type(val)
+
                     field = Field(factory=dtype)
                     field.annotation = dtype
                     field.private = key.startswith("_")
                     field.strict = strict
-                    fields[key] = field
 
                     setattr(self, key, accessor(key, field=field))
                     setattr(self, key, val)
+
+                    fields[key] = field
 
             if hasattr(self, "__build__"):
                 self.__build__(*args, **kwargs)

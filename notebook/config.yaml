@@ -8,3 +8,12 @@ foo:
       price: 10
   tokens: [1, 2, 3]
 id: 1
+items:
+    - - name: egg
+      - price: 1113
+    - - name: socola
+      - price: 23423
+    - - - name: eqw
+        - price: 2334534
+      - - name: wer
+        - price: 2343

@@ -223,40 +223,56 @@ def asdict(
     path: Path = None,
     parser: Parser = DictParser(),
 ):
-    if not isinstance(obj, Dataclass):
-        return parse(type(obj), obj)
+    from .config import Config, ConfigDetail
 
-    fields: Dict[str, Field] = get_fields_info(type(obj), obj)
-    dictionary: Dict[str, Any] = {}
-    for key, field in fields.items():
-        if field.private:
-            continue
+    data = None
 
-        val = getattr(obj, key)
-        val = parser(val, field, by_alias=by_alias)
+    if isinstance(obj, (list, set, tuple)):
+        data = type(obj)(asdict(elem, by_alias=by_alias, parser=parser) for elem in obj)
 
-        if isinstance(val, Dataclass):
+    elif isinstance(obj, (Config, ConfigDetail)):
+        data: Dict[str, Any] = {}
+        for key in obj:
+            val = obj[key]
             val = asdict(val, by_alias=by_alias, parser=parser)
-        elif isinstance(val, (list, set, tuple)):
-            val = type(val)(
-                asdict(elem, by_alias=by_alias, parser=parser) for elem in val
-            )
-        elif isinstance(val, dict):
-            val = {
-                _key: asdict(_val, by_alias=True, parser=parser)
-                for _key, _val in val.items()
-            }
-        else:
-            pass
+            data[key] = val
 
-        key = field.alias if by_alias and field.alias is not None else key
-        if val != Ellipsis:
-            dictionary[key] = val
+    elif not isinstance(obj, Dataclass):
+        data = parse(type(obj), obj)
 
-    if path is not None:
-        dump(dictionary, path=path)
+    else:
+        fields: Dict[str, Field] = get_fields_info(type(obj), obj)
+        data: Dict[str, Any] = {}
 
-    return dictionary
+        for key, field in fields.items():
+            if field.private:
+                continue
+
+            val = getattr(obj, key)
+            val = parser(val, field, by_alias=by_alias)
+
+            if isinstance(val, Dataclass):
+                val = asdict(val, by_alias=by_alias, parser=parser)
+            elif isinstance(val, (list, set, tuple)):
+                val = type(val)(
+                    asdict(elem, by_alias=by_alias, parser=parser) for elem in val
+                )
+            elif isinstance(val, dict):
+                val = {
+                    _key: asdict(_val, by_alias=True, parser=parser)
+                    for _key, _val in val.items()
+                }
+            else:
+                pass
+
+            key = field.alias if by_alias and field.alias is not None else key
+            if val != Ellipsis:
+                data[key] = val
+
+    if path is not None and data is not None:
+        dump(data, path=path)
+
+    return data
 
 
 def asclass(
@@ -288,7 +304,9 @@ def asclass(
                     key = alias[key]
                     env_obj[key] = val
 
-    data = {**env_obj, **path_obj, **local_obj}
+    data = {**env_obj, **path_obj}
+    for key in local_obj:
+        data[key] = local_obj[key]
 
     schema_data = {}
     custom_data = {}
