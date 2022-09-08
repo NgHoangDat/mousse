@@ -14,6 +14,7 @@ from yaml import Loader, load
 
 from .dataclass import Dataclass
 from .parser import asclass, parse, parser
+from .accessor import Accessor
 
 NoneType = type(None)
 
@@ -27,102 +28,36 @@ def load_yaml(stream: Any) -> Dict[str, Any]:
 LOADER = {".json": json.load, ".yaml": load_yaml, ".yml": load_yaml}
 
 
-class ConfigDetail:
-    def __iter__(self):
-        for _ in range(0):
-            yield _
-
-    def __getitem__(self, key: str):
-        return getattr(self, key)
-
-    def __len__(self) -> int:
-        return 0
-
-    def __repr__(self):
-        components = []
-        for key in self:
-            val = getattr(self, key)
-
-            if type(val) is str:
-                components.append(f'{key}="{val}"')
-            else:
-                components.append(f"{key}={val}")
-
-        components = ", ".join(components)
-
-        return f"Config({components})"
+class ReadOnlyFieldException(Exception):
+    def __init__(self, key: str):
+        super().__init__(f"Field `{key}` is readonly")
 
 
-class ConfigDetailContainer:
-    def __init__(self, freeze: bool = True):
-        self.detail = ConfigDetail()
-        self.freeze = freeze
-
-    def __len__(self):
-        return len(self.detail)
+class ConfigMetadata(Dataclass, dynamic=True):
+    readonly: bool = False
 
 
-class ConfigDetailAccessor:
-    def __init__(self, val: Any):
-        self.val = val
+class ConfigAccessor(Accessor):
+    def __set__(self, obj: Any, val: Any):
+        metadata = _get_metadata(obj, self.key)
 
-    def __get__(self, obj: Any, *args, **kwargs):
+        if metadata.readonly:
+            raise ReadOnlyFieldException(self.key)
+
+        metadata.readonly = True
+        self.val = parse(Config, val)
+
+    def __get__(self, obj: Any):
         return self.val
 
-    def __set__(self, obj: Any, val: Any):
-        container = get_container(obj)
-        assert not container.freeze, f"Permission denied"
-        self.val = val
+
+class Config(Dataclass, dynamic=True, accessor=ConfigAccessor):
+    pass
 
 
-@lru_cache(typed=True)
-def get_container(ins: Any):
-    return ConfigDetailContainer()
-
-
-class Config:
-    def __getattribute__(self, key: str):
-        container = get_container(self)
-        if hasattr(container.detail, key):
-            return getattr(container.detail, key)
-
-        return super().__getattribute__(key)
-
-    def __setattr__(self, key: str, val: Any):
-        container = get_container(self)
-        if hasattr(container.detail, key):
-            assert not container.freeze, f"Permission denied"
-            return update(self, **{key: val})
-
-        return super().__setattr__(key, val)
-
-    def __iter__(self):
-        container = get_container(self)
-        for key in container.detail:
-            yield key
-
-    def __getitem__(self, key: str):
-        container = get_container(self)
-        return getattr(container.detail, key)
-
-    def __len__(self) -> int:
-        container = get_container(self)
-        return len(container)
-
-    def __hash__(self):
-        return id(self)
-
-    def __repr__(self):
-        components = []
-        for key in self:
-            val = getattr(self, key)
-            if type(val) is str:
-                components.append(f'{key}="{val}"')
-            else:
-                components.append(f"{key}={val}")
-
-        components = ", ".join(components)
-        return f"Config({components})"
+@lru_cache(maxsize=None)
+def _get_metadata(obj: Any, key: str) -> ConfigMetadata:
+    return ConfigMetadata()
 
 
 async def watch_async(
@@ -176,79 +111,51 @@ def watch(
     task.start()
 
 
-def asdetail(obj: Any):
-    if isinstance(obj, dict):
-        data = {key: ConfigDetailAccessor(asdetail(val)) for key, val in obj.items()}
-
-        def __iter__(self):
-            for key in obj:
-                yield key
-
-        def __len__(self):
-            return len(obj)
-
-        data["__iter__"] = __iter__
-        data["__len__"] = __len__
-
-        return type("ConfigDetail", (ConfigDetail,), data)()
-
-    if isinstance(obj, (list, set, tuple)):
-        return tuple(asdetail(val) for val in obj)
-
-    return obj
-
-
 def update(config: Config, **kwargs):
-    container = get_container(config)
-    data = {}
     for key, val in kwargs.items():
-        data[key] = asdetail(val)
-
-    detail = container.detail
-
-    def __iter__(self):
-        for key in detail:
-            yield key
-
-        for key in kwargs:
-            yield key
-
-    def __len__(self):
-        return len(detail) + len(kwargs)
-
-    data["__iter__"] = __iter__
-    data["__len__"] = __len__
-
-    container.detail = type("ConfigDetail", (type(detail),), data)()
+        setattr(config, key, val)
 
 
-def freeze(config: Config):
-    container = get_container(config)
-    container.freeze = True
+def freeze(config: Any):
+    if isinstance(config, tuple):
+        for elem in config:
+            freeze(elem)
+        return
+
+    if isinstance(config, Config):
+        for key, val in config:
+            metadata = _get_metadata(config, key)
+            metadata.readonly = True
+            freeze(val)
 
 
-def unfreeze(config: Config):
-    container = get_container(config)
-    container.freeze = False
+def unfreeze(config: Any):
+    if isinstance(config, tuple):
+        for elem in config:
+            unfreeze(elem)
+        return
+
+    if isinstance(config, Config):
+        for key, val in config:
+            metadata = _get_metadata(config, key)
+            metadata.readonly = False
+            unfreeze(val)
 
 
 @parser(Config)
-def parse_config(G: Type[Config], config: Config):
-    data = {}
-    for key in config:
-        val = getattr(config, key)
-        val_type = type(val)
-        if issubclass(val_type, ConfigDetail):
-            val = parse(Config, val)
-        else:
-            if issubclass(val_type, (list, tuple, set)):
-                val = parse(List[Union[Config, Any]], val)
+def parse_config(G: Type[Config], config: Union[Mapping, list, tuple, set]):
+    if isinstance(config, (list, tuple, set)):
+        return tuple(parse_config(G, elem) for elem in config)
 
-            val = parse(val_type, val)
+    if isinstance(config, Mapping):
+        data = {}
+        for key, val in config.items():
+            val = parse_config(Config, val)
+            data[key] = val
 
-        data[key] = val
+        return Config(**data)
 
-    return data
+    return config
 
 
 @lru_cache(typed=True)

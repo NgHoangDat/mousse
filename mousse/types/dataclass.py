@@ -2,7 +2,7 @@ from copy import copy, deepcopy
 from inspect import Parameter, Signature
 from typing import *
 
-from .accessor import Accessor
+from .accessor import Accessor, get_accessors_info
 from .field import Field, get_fields_info
 
 __all__ = ["Dataclass", "DataMetaclass"]
@@ -21,6 +21,7 @@ class DataMetaclass(type):
         parameters = [Parameter("self", Parameter.POSITIONAL_ONLY)]
         defaults = []
         fields = {}
+        accessors = {}
 
         if "__annotations__" in data:
             annotations = data.pop("__annotations__")
@@ -43,7 +44,8 @@ class DataMetaclass(type):
                 if field.strict is None:
                     field.strict = strict
 
-                data[key] = accessor(key, field=field)
+                accessors[key] = accessor(key, field=field)
+                data[key] = accessors[key]
                 parameters.append(
                     Parameter(
                         key,
@@ -57,25 +59,38 @@ class DataMetaclass(type):
         def __init__(self, *args, **kwargs):
             fields = get_fields_info(self.__class__, self)
             for key, val in kwargs.items():
-                if key in fields:
+                if key in fields or dynamic:
                     setattr(self, key, val)
-                    continue
-
-                if dynamic and not key.startswith("_"):
-                    dtype = type(val)
-
-                    field = Field(factory=dtype)
-                    field.annotation = dtype
-                    field.private = key.startswith("_")
-                    field.strict = strict
-
-                    setattr(self, key, accessor(key, field=field))
-                    setattr(self, key, val)
-
-                    fields[key] = field
 
             if hasattr(self, "__build__"):
                 self.__build__(*args, **kwargs)
+
+        def __setattr__(self, key: str, val: Any):
+            fields = get_fields_info(self.__class__, self)
+            accessors = get_accessors_info(self.__class__, self)
+            if key not in fields and dynamic:
+                dtype = type(val)
+
+                field = Field(val, factory=dtype)
+                field.annotation = dtype
+                field.private = key.startswith("_")
+                field.strict = strict
+                fields[key] = field
+
+                accessors[key] = accessor(key, field=field)
+                object.__setattr__(self, key, accessors[key])
+
+            accessors[key].__set__(self, val)
+
+        def __getattr__(self, key: str):
+            if key == "__class__":
+                return object.__getattribute__(self, key)
+
+            accessors = get_accessors_info(self.__class__, self)
+            if key in accessors:
+                return accessors[key].__get__(self)
+
+            return object.__getattribute__(self, key)
 
         def __copy__(self):
             cls = self.__class__
@@ -142,6 +157,8 @@ class DataMetaclass(type):
         __init__.__defaults__ = tuple(defaults)
 
         data["__init__"] = __init__
+        data["__setattr__"] = __setattr__
+        data["__getattribute__"] = __getattr__
         data["__copy__"] = __copy__
         data["__deepcopy__"] = __deepcopy__
         data["__getstate__"] = __getstate__
@@ -157,6 +174,8 @@ class DataMetaclass(type):
                 fields_info.update(get_fields_info(base))
 
         fields_info.update(fields)
+
+        get_accessors_info(cls).update(accessors)
         return cls
 
 

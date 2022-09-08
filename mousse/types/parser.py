@@ -223,19 +223,11 @@ def asdict(
     path: Path = None,
     parser: Parser = DictParser(),
 ):
-    from .config import Config, ConfigDetail
 
     data = None
 
     if isinstance(obj, (list, set, tuple)):
         data = type(obj)(asdict(elem, by_alias=by_alias, parser=parser) for elem in obj)
-
-    elif isinstance(obj, (Config, ConfigDetail)):
-        data: Dict[str, Any] = {}
-        for key in obj:
-            val = obj[key]
-            val = asdict(val, by_alias=by_alias, parser=parser)
-            data[key] = val
 
     elif not isinstance(obj, Dataclass):
         data = parse(type(obj), obj)
@@ -305,6 +297,9 @@ def asclass(
                     env_obj[key] = val
 
     data = {**env_obj, **path_obj}
+    if isinstance(local_obj, Dataclass):
+        local_obj = asdict(local_obj)
+
     for key in local_obj:
         data[key] = local_obj[key]
 

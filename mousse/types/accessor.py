@@ -1,4 +1,5 @@
 from copy import deepcopy
+from functools import lru_cache
 from typing import *
 
 from .field import Field
@@ -74,3 +75,23 @@ class Accessor:
                     obj, val
                 ), f"Validation failed for [{self.key}]: {validator.__name__}"
         return True
+
+
+@lru_cache(maxsize=None)
+def _get_accessors_info(cls: Any) -> Dict[str, Accessor]:
+    return {}
+
+
+@lru_cache(maxsize=None)
+def _get_customs_info(cls: Any) -> Dict[str, Accessor]:
+    return {}
+
+
+def get_accessors_info(cls: Any, obj: Any = None) -> Dict[str, Accessor]:
+    defaults = _get_accessors_info(cls)
+    if obj is not None:
+        customs = _get_customs_info(obj)
+        customs.update(defaults)
+        return customs
+
+    return defaults
