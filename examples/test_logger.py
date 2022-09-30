@@ -1,7 +1,7 @@
 from mousse import get_logger
 
 logger = get_logger()
-logger.load_config("config/logger.yaml")
+logger.add_handler("RotatingFileHandler", path="logs/main.out")
 
 logger.info("Call from global scope")
 logger.error("This is a error")
