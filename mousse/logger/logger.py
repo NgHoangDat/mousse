@@ -119,7 +119,11 @@ class LoggerWrapper:
 
             cwd_path = Path(os.getcwd())
             filepath = Path(caller.f_code.co_filename).resolve()
-            filepath = filepath.relative_to(cwd_path)
+            try:
+                filepath = filepath.relative_to(cwd_path)
+            except ValueError:
+                pass
+
             filename = f"{filepath.parent}/{filepath.stem}"
 
             extra = {

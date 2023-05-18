@@ -69,7 +69,7 @@ class Field:
 def get_fields_info(cls: Any, ins: Any = None) -> Dict[str, Field]:
     defaults = _get_fields_info(cls)
     if ins is not None:
-        custom = _get_custome_info(ins)
+        custom = _get_custome_info(id(ins))
         custom.update(defaults)
         return custom
 

@@ -23,6 +23,10 @@ class DataMetaclass(type):
         fields = {}
         accessors = {}
 
+        for base in bases[::-1]:
+            if issubclass(base, Dataclass):
+                accessors.update(get_accessors_info(base))
+
         if "__annotations__" in data:
             annotations = data.pop("__annotations__")
             for key, dtype in annotations.items():
@@ -152,7 +156,7 @@ class DataMetaclass(type):
 
             components = ", ".join(components)
             return f"{name}({components})"
-
+        
         setattr(__init__, "__signature__", Signature(parameters=parameters))
         __init__.__defaults__ = tuple(defaults)
 

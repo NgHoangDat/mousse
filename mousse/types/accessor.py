@@ -19,12 +19,12 @@ class Accessor:
         if obj is None:
             return self
 
-        if obj not in self.storage:
+        if id(obj) not in self.storage:
             if self.field.factory is not None:
-                self.storage[obj] = self.field.factory()
+                self.storage[id(obj)] = self.field.factory()
             else:
-                self.storage[obj] = deepcopy(self.field.default)
-        val = self.storage.get(obj)
+                self.storage[id(obj)] = deepcopy(self.field.default)
+        val = self.storage.get(id(obj))
 
         for getter in self.field.getters.values():
             if getter.static:
@@ -53,7 +53,7 @@ class Accessor:
 
         self.validate(obj, val)
 
-        self.storage[obj] = val
+        self.storage[id(obj)] = val
 
     def validator(self, func: Callable = None, static: bool = True):
         return self.field.validator(func, static=static)
@@ -90,7 +90,7 @@ def _get_customs_info(cls: Any) -> Dict[str, Accessor]:
 def get_accessors_info(cls: Any, obj: Any = None) -> Dict[str, Accessor]:
     defaults = _get_accessors_info(cls)
     if obj is not None:
-        customs = _get_customs_info(obj)
+        customs = _get_customs_info(id(obj))
         customs.update(defaults)
         return customs
 
