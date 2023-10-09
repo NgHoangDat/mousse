@@ -3,7 +3,6 @@ import functools
 import operator
 import time
 from collections.abc import Hashable
-
 from typing import *
 from typing import Callable
 

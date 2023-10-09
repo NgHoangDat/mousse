@@ -4,7 +4,6 @@ from typing import *
 
 from ..types import Accessor, DataMetaclass
 
-
 __all__ = ["Listener", "Mediator"]
 
 

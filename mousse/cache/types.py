@@ -2,7 +2,6 @@ from decimal import Decimal
 from typing import *
 from typing import Callable
 
-
 Number = Union[float, int, Decimal]
 Timer = Callable[[], Number]
 

@@ -1,5 +1,5 @@
 from .export import export, export_instance, export_subclass
-from .logger import get_logger, log_error, log_time, Handler, handler_registry
+from .logger import Handler, get_logger, handler_registry, log_error, log_time
 from .pattern import (
     AutoRegistry,
     Listener,

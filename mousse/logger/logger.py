@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import *
 from typing import Callable
 
+from ..types import Dataclass, asclass, asdict, load_config
 from .handler import Handler, handler_registry
-from ..types import Dataclass, asclass, load_config, asdict
 
 __all__ = ["get_logger", "log_error", "log_time"]
 

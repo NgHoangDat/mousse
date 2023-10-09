@@ -1,4 +1,4 @@
-from .singleton import *
+from .mediator import *
 from .object_pool import *
 from .registry import *
-from .mediator import *
+from .singleton import *

@@ -2,7 +2,7 @@ from copy import deepcopy
 from functools import lru_cache
 from typing import *
 
-from .field import Field
+from .field import Field, Strictness
 
 
 class Accessor:
@@ -35,10 +35,22 @@ class Accessor:
         return val
 
     def __set__(self, obj: Any, val: Any):
-        from .validator import validate
         from .parser import parse
+        from .validator import validate
 
-        val = parse(self.field.annotation, val)
+        strictness = min(Strictness)
+        for level in sorted(Strictness):
+            if self.field.strict <= level:
+                strictness = level
+                break
+
+        if strictness == Strictness.REJECT:
+            assert isinstance(
+                val, self.field.annotation
+            ), f"Invalid datatype: require {self.field.annotation}, get {type(val)}"
+
+        if strictness == Strictness.CONVERT:
+            val = parse(self.field.annotation, val)
 
         for setter in self.field.setters.values():
             if setter.static:
@@ -46,7 +58,6 @@ class Accessor:
             else:
                 val = setter(obj, val)
 
-        if self.field.strict:
             assert validate(
                 self.field.annotation, val
             ), f"Invalid datatype: require {self.field.annotation}, get {type(val)}"
@@ -65,6 +76,17 @@ class Accessor:
         return self.field.getter(func, static=static)
 
     def validate(self, obj: Any, val: Any) -> bool:
+        strictness = min(Strictness)
+        for level in sorted(Strictness):
+            if self.field.strict <= level:
+                strictness = level
+                break
+
+        if strictness == Strictness.REJECT:
+            assert isinstance(
+                val, self.field.annotation
+            ), f"Invalid datatype: require {self.field.annotation}, get {type(val)}"
+
         for validator in self.field.validators.values():
             if validator.static:
                 assert validator(

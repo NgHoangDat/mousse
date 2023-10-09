@@ -1,8 +1,8 @@
-from inspect import currentframe, getmembers, getmodule, getouterframes, isclass
-from importlib import import_module
-from pathlib import Path
-from typing import Callable, Dict, Any
 from functools import lru_cache
+from importlib import import_module
+from inspect import currentframe, getmembers, getmodule, getouterframes, isclass
+from pathlib import Path
+from typing import Any, Callable, Dict
 
 __all__ = ["export", "export_subclass", "export_instance"]
 
@@ -44,7 +44,7 @@ def export(
         package = _locals["__name__"]
 
     cached = __get_cache()
-    unique_key = (current_file.as_posix(), call_frame.frame.f_lineno)
+    unique_key = (module, package)
 
     if unique_key in cached:
         members = cached[unique_key]

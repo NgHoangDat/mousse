@@ -15,7 +15,7 @@ class DataMetaclass(type):
         bases: Tuple[type, ...],
         data: Dict[str, Any],
         accessor: Type[Accessor] = Accessor,
-        strict: bool = False,
+        strict: int = 0,
         dynamic: bool = False,
     ):
         parameters = [Parameter("self", Parameter.POSITIONAL_ONLY)]
@@ -65,6 +65,9 @@ class DataMetaclass(type):
             for key, val in kwargs.items():
                 if key in fields or dynamic:
                     setattr(self, key, val)
+
+            for key, val in accessors.items():
+                val.validate(self, getattr(self, key))
 
             if hasattr(self, "__build__"):
                 self.__build__(*args, **kwargs)
@@ -156,7 +159,7 @@ class DataMetaclass(type):
 
             components = ", ".join(components)
             return f"{name}({components})"
-        
+
         setattr(__init__, "__signature__", Signature(parameters=parameters))
         __init__.__defaults__ = tuple(defaults)
 

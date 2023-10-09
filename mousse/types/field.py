@@ -1,8 +1,15 @@
 from collections import OrderedDict
+from enum import Enum
 from functools import lru_cache
 from typing import *
 
-__all__ = ["Field", "get_fields_info"]
+__all__ = ["Field", "get_fields_info", "Strictness"]
+
+
+class Strictness(int, Enum):
+    IGNORE: int = 0
+    CONVERT: int = 10
+    REJECT: int = 100
 
 
 class Function(NamedTuple):
@@ -20,7 +27,7 @@ class Field:
         alias: str = None,
         freeze: bool = False,
         private: bool = None,
-        strict: bool = None,
+        strict: int = None,
         factory: Callable = None,
     ) -> None:
         self.default = default

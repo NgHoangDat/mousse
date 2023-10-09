@@ -1,7 +1,6 @@
 from functools import partial
 from typing import *
 
-
 __all__ = ["Registry", "AutoRegistry", "register"]
 
 
@@ -67,6 +66,7 @@ class AutoRegistry(type):
         bases: Tuple[Type, ...],
         namespace: Dict[str, Any],
         registry: str = None,
+        overwrite: bool = False,
         **kwargs,
     ):
         new_cls = super().__new__(cls, name, bases, namespace)
@@ -76,8 +76,12 @@ class AutoRegistry(type):
                     registry = getattr(base, "__REGISTRY__")
                     break
 
-        Registry.get(registry).register(target=new_cls)
+        if not isinstance(registry, Registry):
+            registry = Registry.get(registry)
+
+        registry.register(target=new_cls, overwrite=overwrite)
         setattr(new_cls, "__REGISTRY__", registry)
+
         return new_cls
 
 

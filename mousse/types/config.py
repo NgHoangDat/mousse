@@ -12,9 +12,9 @@ from typing import Callable
 from dialga import call_after
 from yaml import Loader, load
 
+from .accessor import Accessor
 from .dataclass import Dataclass
 from .parser import asclass, parse, parser
-from .accessor import Accessor
 
 NoneType = type(None)
 

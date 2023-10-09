@@ -3,16 +3,16 @@ import sys
 __all__ = ["Generic", "get_args", "get_origin", "is_generic"]
 
 if sys.version_info > (3, 9):
-    from typing import _SpecialGenericAlias, _GenericAlias, _SpecialForm, Union
+    from typing import Union, _GenericAlias, _SpecialForm, _SpecialGenericAlias
 
     Generic = Union[_GenericAlias, _SpecialGenericAlias, _SpecialForm]
 elif sys.version_info > (3, 7):
-    from typing import _GenericAlias, _SpecialForm, Union
+    from typing import Union, _GenericAlias, _SpecialForm
 
     Generic = Union[_GenericAlias, _SpecialForm]
 else:
-    from typing import *
     from typing import GenericMeta as Generic
+    from typing import *
 
     setattr(Generic, "__args__", (Generic,))
 
@@ -24,7 +24,7 @@ if sys.version_info > (3, 8):
         return isinstance(generic, get_args(Generic))
 
 else:
-    from typing import List, Set, Sequence, Tuple
+    from typing import List, Sequence, Set, Tuple
 
     generic_mappings = {
         List: list,

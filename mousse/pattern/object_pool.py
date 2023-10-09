@@ -1,7 +1,6 @@
 from collections import OrderedDict
 from typing import *
 
-
 __all__ = ["ObjectPool", "object_pool"]
 
 
